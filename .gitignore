@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+tests/.tmp/
+logs/*.log
+src/logs/*.log
+**/snapshots/*.jpg
+**/snapshots/*.jpeg
+**/snapshots/*.png
+config.yaml

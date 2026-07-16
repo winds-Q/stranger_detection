@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>陌生人检测系统</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="header">
+    <h1>陌生人检测报警系统</h1>
+    <div class="status-bar">
+      <span id="statusDot" class="dot off"></span>
+      <span id="statusText">未运行</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside class="sidebar">
+      <section class="card">
+        <h3>检测控制</h3>
+        <div class="btn-group">
+          <button id="btnStart" class="btn btn-green" onclick="startDetection()">启动检测</button>
+          <button id="btnStop"  class="btn btn-red"   onclick="stopDetection()"  disabled>停止检测</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>上传熟人照片</h3>
+        <label class="upload-btn" for="fileInput">选择照片</label>
+        <input id="fileInput" type="file" accept="image/*" multiple hidden onchange="handleUpload(this)">
+        <div id="uploadStatus" class="upload-status"></div>
+      </section>
+
+      <section class="card">
+        <h3>邮件配置</h3>
+        <form id="configForm" onsubmit="return saveConfig()">
+          <div class="form-row">
+            <label class="form-label">
+              <input type="checkbox" id="cfgEnabled"> 启用报警
+            </label>
+          </div>
+          <div class="form-row">
+            <label class="form-label">SMTP 服务器</label>
+            <input type="text" id="cfgSmtpServer" class="form-input" placeholder="smtp.qq.com">
+          </div>
+          <div class="form-row">
+            <label class="form-label">SMTP 端口</label>
+            <input type="number" id="cfgSmtpPort" class="form-input" placeholder="587">
+          </div>
+          <div class="form-row">
+            <label class="form-label">发件邮箱</label>
+            <input type="email" id="cfgSenderEmail" class="form-input" placeholder="your@email.com">
+          </div>
+          <div class="form-row">
+            <label class="form-label">授权码 <span id="envHint" class="env-hint" style="display:none">(已从环境变量读取)</span></label>
+            <input type="password" id="cfgSenderPassword" class="form-input" placeholder="SMTP 授权码">
+          </div>
+          <div class="form-row">
+            <label class="form-label">收件邮箱</label>
+            <input type="email" id="cfgReceiverEmail" class="form-input" placeholder="receiver@email.com">
+          </div>
+          <div class="form-row">
+            <label class="form-label">冷却时间（秒）</label>
+            <input type="number" id="cfgCooldown" class="form-input" placeholder="180">
+          </div>
+          <button type="submit" class="btn btn-green btn-full">保存配置</button>
+          <div id="configStatus" class="upload-status"></div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h3>熟人列表 <span id="faceCount" class="badge"></span></h3>
+        <div id="faceList" class="face-list">加载中...</div>
+      </section>
+    </aside>
+
+    <section class="log-panel card">
+      <div class="log-header">
+        <h3>运行日志</h3>
+        <button id="btnClear" class="btn btn-small" onclick="clearLogs()">清屏</button>
+      </div>
+      <div id="logViewer" class="log-viewer"></div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

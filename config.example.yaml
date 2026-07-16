@@ -1,0 +1,23 @@
+camera:
+  device_id: 0
+  width: 640
+  height: 480
+
+recognition:
+  tolerance: 0.5
+  model: "hog"
+  stranger_tolerance: 0.5
+  stranger_retention_seconds: 3600
+
+alert:
+  enabled: true
+  cooldown_seconds: 180
+  smtp_server: "smtp.qq.com"
+  smtp_port: 587
+  sender_email: "your_email@qq.com"
+  sender_password: ""
+  receiver_email: "receiver@example.com"
+
+snapshot:
+  save_to: "./snapshots/"
+  max_snapshots: 100
