@@ -16,7 +16,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from camera import Camera
 from detector import FaceDetector
-from recognizer import FaceRecognizer, StrangerTracker
+from recognizer import (
+    FaceRecognizer,
+    StrangerTracker,
+    SUPPORTED_IMAGE_EXTENSIONS,
+)
 from alerter import Alerter, AsyncAlertDispatcher
 from config_loader import Config
 from logger import setup_logger
@@ -253,7 +257,11 @@ def api_faces():
     if os.path.isdir(_known_faces_dir):
         for fname in os.listdir(_known_faces_dir):
             path = os.path.join(_known_faces_dir, fname)
-            if os.path.isfile(path):
+            extension = os.path.splitext(fname)[1].lower()
+            if (
+                os.path.isfile(path)
+                and extension in SUPPORTED_IMAGE_EXTENSIONS
+            ):
                 entries.append({
                     "name": fname,
                     "size": os.path.getsize(path),

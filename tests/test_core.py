@@ -17,7 +17,7 @@ if SRC_DIR not in sys.path:
 from alerter import Alerter, AsyncAlertDispatcher
 from camera import Camera
 from config_loader import Config
-from recognizer import StrangerTracker
+from recognizer import FaceRecognizer, StrangerTracker
 from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
 from visual import annotate_frame
@@ -176,6 +176,15 @@ class WebAppTests(unittest.TestCase):
             web_app._known_faces_dir,
         )
 
+    def test_faces_api_hides_gitkeep_and_non_image_files(self):
+        with (
+            patch.object(web_app, "_known_faces_dir", TEST_TEMP_ROOT),
+            patch("web.app.os.listdir", return_value=[".gitkeep", "notes.txt"]),
+            patch("web.app.os.path.isfile", return_value=True),
+        ):
+                response = self.client.get("/api/faces")
+        self.assertEqual([], response.get_json())
+
     def test_invalid_upload_is_rejected(self):
         with patch.object(web_app, "_known_faces_dir", TEST_TEMP_ROOT):
             response = self.client.post(
@@ -254,6 +263,19 @@ class StrangerTrackerTests(unittest.TestCase):
         tracker.identify(np.full(128, 0.04))
 
         self.assertEqual(stranger_id, tracker.identify(np.zeros(128)))
+
+
+class FaceRecognizerLoadingTests(unittest.TestCase):
+    def test_ignores_gitkeep_without_loading_it_as_an_image(self):
+        with (
+            patch("recognizer.os.path.isdir", return_value=True),
+            patch("recognizer.os.listdir", return_value=[".gitkeep"]),
+            patch("recognizer.os.path.isfile", return_value=True),
+            patch("recognizer.face_recognition.load_image_file") as loader,
+        ):
+                recognizer = FaceRecognizer(TEST_TEMP_ROOT)
+        loader.assert_not_called()
+        self.assertEqual(0, recognizer.known_count)
 
 
 class FrameProcessingControllerTests(unittest.TestCase):

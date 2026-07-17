@@ -8,6 +8,7 @@ import face_recognition
 import numpy as np
 
 logger = logging.getLogger(__name__)
+SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
 
 
 class FaceRecognizer:
@@ -25,8 +26,17 @@ class FaceRecognizer:
             if not os.path.isfile(filepath):
                 continue
 
-            image = face_recognition.load_image_file(filepath)
-            encodings = face_recognition.face_encodings(image)
+            extension = os.path.splitext(filename)[1].lower()
+            if extension not in SUPPORTED_IMAGE_EXTENSIONS:
+                logger.debug("跳过非图片文件: %s", filename)
+                continue
+
+            try:
+                image = face_recognition.load_image_file(filepath)
+                encodings = face_recognition.face_encodings(image)
+            except (OSError, ValueError, TypeError) as exc:
+                logger.warning("无法读取熟人照片 %s，已跳过: %s", filename, exc)
+                continue
 
             if not encodings:
                 logger.warning("未在 %s 中检测到人脸，已跳过", filename)
