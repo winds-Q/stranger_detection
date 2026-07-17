@@ -14,7 +14,7 @@ os.makedirs(TEST_TEMP_ROOT, exist_ok=True)
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-from alerter import Alerter
+from alerter import Alerter, AsyncAlertDispatcher
 from camera import Camera
 from config_loader import Config
 from recognizer import StrangerTracker
@@ -84,6 +84,45 @@ class AlerterTests(unittest.TestCase):
 
         self.assertTrue(alerter.send_alert(np.zeros((8, 8, 3), dtype=np.uint8)))
         smtp_ssl.assert_called_once_with("smtp.example.com", 465, timeout=15)
+
+
+class AsyncAlertDispatcherTests(unittest.TestCase):
+    def test_dispatches_in_background_and_retries_failure(self):
+        alerter = MagicMock()
+        alerter.is_configured = True
+        alerter.send_alert.side_effect = [False, True]
+        dispatcher = AsyncAlertDispatcher(
+            alerter,
+            cooldown_seconds=0,
+            retry_count=1,
+            retry_backoff_seconds=0,
+        )
+
+        self.assertTrue(dispatcher.submit(np.zeros((4, 4, 3)), "event-1"))
+        dispatcher._queue.join()
+        dispatcher.close()
+
+        self.assertEqual(2, alerter.send_alert.call_count)
+        first_call = alerter.send_alert.call_args_list[0]
+        retry_call = alerter.send_alert.call_args_list[1]
+        self.assertFalse(first_call.kwargs["bypass_cooldown"])
+        self.assertTrue(retry_call.kwargs["bypass_cooldown"])
+        self.assertFalse(retry_call.kwargs["save_snapshot"])
+
+    def test_rejects_duplicate_event_during_cooldown(self):
+        now = [10.0]
+        alerter = MagicMock()
+        alerter.is_configured = False
+        dispatcher = AsyncAlertDispatcher(
+            alerter,
+            cooldown_seconds=180,
+            clock=lambda: now[0],
+        )
+
+        self.assertTrue(dispatcher.submit(np.zeros((2, 2, 3)), "event-1"))
+        self.assertFalse(dispatcher.submit(np.zeros((2, 2, 3)), "event-1"))
+        dispatcher._queue.join()
+        dispatcher.close()
 
 
 class CameraTests(unittest.TestCase):

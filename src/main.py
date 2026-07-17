@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from camera import Camera
 from detector import FaceDetector
 from recognizer import FaceRecognizer, StrangerTracker
-from alerter import Alerter
+from alerter import Alerter, AsyncAlertDispatcher
 from config_loader import Config
 from logger import setup_logger
 from processing import FrameProcessingController, StrangerConfirmation
@@ -54,6 +54,13 @@ def main():
         max_samples=config.recognition.get("stranger_max_samples", 5),
     )
     alerter = Alerter(config)
+    alert_dispatcher = AsyncAlertDispatcher(
+        alerter,
+        cooldown_seconds=config.alert.get("cooldown_seconds", 180),
+        queue_size=config.alert.get("queue_size", 20),
+        retry_count=config.alert.get("retry_count", 2),
+        retry_backoff_seconds=config.alert.get("retry_backoff_seconds", 2),
+    )
     processor = FrameProcessingController(**config.processing)
     confirmation = StrangerConfirmation(**config.detection_confirmation)
     event_manager = StrangerEventManager(**config.stranger_tracking)
@@ -99,7 +106,7 @@ def main():
             if alert_event_ids:
                 alert_frame = annotate_frame(frame, annotations)
                 for event_id in alert_event_ids:
-                    alerter.send_alert(alert_frame, event_id)
+                    alert_dispatcher.submit(alert_frame, event_id)
 
             confirmation.cleanup()
             for departed_id in event_manager.mark_departures():
@@ -111,6 +118,7 @@ def main():
         logger.info("收到退出信号，正在关闭...")
     finally:
         camera.release()
+        alert_dispatcher.close()
         logger.info("系统已退出")
 
 

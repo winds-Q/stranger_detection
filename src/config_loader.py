@@ -43,6 +43,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "sender_email": "",
         "sender_password": "",
         "receiver_email": "",
+        "queue_size": 20,
+        "retry_count": 2,
+        "retry_backoff_seconds": 2,
     },
     "snapshot": {
         "save_to": "./snapshots/",
