@@ -57,6 +57,10 @@
           <div><h3>熟人录入</h3><div class="card-description">上传清晰的单人人脸照片</div></div>
           <span class="section-icon">＋</span>
         </div>
+        <div class="form-row">
+          <label class="form-label" for="knownPersonName">熟人姓名</label>
+          <input id="knownPersonName" type="text" class="form-input" maxlength="40" placeholder="例如：张三">
+        </div>
         <label class="upload-btn" for="fileInput">选择照片</label>
         <input id="fileInput" type="file" accept="image/*" multiple hidden onchange="handleUpload(this)">
         <div id="uploadStatus" class="upload-status"></div>

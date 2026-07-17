@@ -90,6 +90,7 @@ def main():
 
     logger.info("陌生人检测系统已启动 (config=%s)", config_path)
 
+    known_last_logged = {}
     try:
         while True:
             frame = camera.get_frame()
@@ -127,6 +128,10 @@ def main():
                         alert_event_ids.append(event_id)
                 else:
                     annotations.append((location, known_name, False))
+                    now = time.monotonic()
+                    if now - known_last_logged.get(known_name, 0) >= 30:
+                        logger.info("检测到熟人：%s", known_name)
+                        known_last_logged[known_name] = now
 
             if alert_event_ids:
                 alert_frame = annotate_frame(frame, annotations)

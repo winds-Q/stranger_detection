@@ -223,6 +223,12 @@ function handleUpload(input) {
     if (!files.length) return;
 
     const statusEl = document.getElementById("uploadStatus");
+    const personName = document.getElementById("knownPersonName").value.trim();
+    if (!personName) {
+        statusEl.textContent = "请先填写熟人姓名";
+        input.value = "";
+        return;
+    }
     statusEl.textContent = "上传中...";
 
     let done = 0;
@@ -230,6 +236,7 @@ function handleUpload(input) {
     for (const file of files) {
         const form = new FormData();
         form.append("file", file);
+        form.append("person_name", personName);
 
         fetch("/api/faces/upload", { method: "POST", body: form })
             .then(async r => ({ ok: r.ok, data: await r.json() }))
@@ -287,8 +294,9 @@ async function loadFaces() {
         } else {
             list.innerHTML = items.map(f => {
                 const safeName = escapeHtml(f.name);
+                const personName = escapeHtml(f.person_name || f.name);
                 return `<div class="face-item">
-                    <span class="name" title="${safeName}">${safeName}</span>
+                    <span class="name" title="样本文件：${safeName}"><strong>${personName}</strong><small>${safeName}</small></span>
                     <button class="delete-btn" title="删除" data-filename="${safeName}">&times;</button>
                 </div>`;
             }).join("");

@@ -6,6 +6,8 @@ import re
 import sys
 import threading
 import time
+import unicodedata
+import uuid
 
 import cv2
 import numpy as np
@@ -21,6 +23,7 @@ from recognizer import (
     FaceRecognizer,
     StrangerTracker,
     SUPPORTED_IMAGE_EXTENSIONS,
+    person_name_from_filename,
 )
 from alerter import Alerter, AsyncAlertDispatcher
 from config_loader import Config
@@ -74,6 +77,9 @@ def _init_sse_handler():
 
 class _SSELogHandler(logging.Handler):
     def emit(self, record):
+        # Browser polling/access records are implementation noise, not runtime events.
+        if record.name == "werkzeug":
+            return
         try:
             entry = self.format(record)
             _log_queue.put_nowait(entry)
@@ -95,6 +101,7 @@ def _detection_loop(config):
     _log = logging.getLogger(__name__)
     camera = None
     alert_dispatcher = None
+    known_last_logged = {}
 
     try:
         camera = Camera(
@@ -203,6 +210,10 @@ def _detection_loop(config):
                         alert_event_ids.append(event_id)
                 else:
                     annotations.append((location, known_name, False))
+                    now = time.monotonic()
+                    if now - known_last_logged.get(known_name, 0) >= 30:
+                        _log.info("检测到熟人：%s", known_name)
+                        known_last_logged[known_name] = now
 
             if alert_event_ids:
                 alert_frame = annotate_frame(frame, annotations)
@@ -473,6 +484,7 @@ def api_faces():
             ):
                 entries.append({
                     "name": fname,
+                    "person_name": person_name_from_filename(fname),
                     "size": os.path.getsize(path),
                 })
     return jsonify(entries)
@@ -484,7 +496,8 @@ def api_upload():
         return jsonify({"ok": False, "message": "未选择文件"}), 400
 
     file = request.files["file"]
-    filename = secure_filename(file.filename or "")
+    original_filename = secure_filename(file.filename or "")
+    filename = original_filename
     if not filename:
         return jsonify({"ok": False, "message": "文件名为空"}), 400
 
@@ -497,9 +510,13 @@ def api_upload():
     if image is None:
         return jsonify({"ok": False, "message": "文件不是有效图片"}), 400
 
-    validation = FaceImageValidator(Config(_CONFIG_PATH), _known_faces_dir).validate(
-        image, filename
+    person_name, error = _normalize_person_name(
+        request.form.get("person_name") or os.path.splitext(original_filename)[0]
     )
+    if error:
+        return jsonify({"ok": False, "message": error}), 400
+    filename = f"{person_name.replace(' ', '_')}__{uuid.uuid4().hex[:10]}{extension}"
+    validation = FaceImageValidator(Config(_CONFIG_PATH), _known_faces_dir).validate(image)
     if not validation.ok:
         return jsonify({"ok": False, "message": validation.message}), 400
 
@@ -511,10 +528,21 @@ def api_upload():
     return jsonify({"ok": True, "message": f"{filename} 已上传"})
 
 
+def _normalize_person_name(value):
+    name = unicodedata.normalize("NFKC", str(value or "")).strip()
+    if not name:
+        return None, "请填写熟人姓名"
+    if len(name) > 40:
+        return None, "熟人姓名不能超过 40 个字符"
+    if any(not (char.isalnum() or char in " _-") for char in name):
+        return None, "熟人姓名只能包含中文、字母、数字、空格、下划线或短横线"
+    return name, None
+
+
 @app.route("/api/faces/<filename>", methods=["DELETE"])
 def api_delete_face(filename):
-    safe_name = secure_filename(filename)
-    if not safe_name or safe_name != filename:
+    safe_name = os.path.basename(filename)
+    if not safe_name or safe_name != filename or os.path.splitext(safe_name)[1].lower() not in _allowed_extensions:
         return jsonify({"ok": False, "message": "文件名不合法"}), 400
     path = os.path.join(_known_faces_dir, safe_name)
     if not os.path.isfile(path):

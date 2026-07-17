@@ -11,6 +11,12 @@ logger = logging.getLogger(__name__)
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
 
 
+def person_name_from_filename(filename: str) -> str:
+    """Read the display name from managed ``name__sample-id.jpg`` files."""
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    return stem.split("__", 1)[0] if "__" in stem else stem
+
+
 class FaceRecognizer:
     def __init__(self, known_faces_dir: str, tolerance: float = 0.5):
         self._tolerance = tolerance
@@ -42,7 +48,7 @@ class FaceRecognizer:
                 logger.warning("未在 %s 中检测到人脸，已跳过", filename)
                 continue
 
-            name = os.path.splitext(filename)[0]
+            name = person_name_from_filename(filename)
             if len(encodings) > 1:
                 logger.warning(
                     "在 %s 中检测到 %d 张人脸，取第一张",
@@ -74,7 +80,8 @@ class FaceRecognizer:
             )
             return self._known_names[matched_index]
 
-        logger.info("检测到陌生人 (最短距离=%.4f > tolerance=%.2f)", min_distance, self._tolerance)
+        # New stranger identities are logged by StrangerTracker; per-frame misses are noisy.
+        logger.debug("未匹配熟人 (最短距离=%.4f > tolerance=%.2f)", min_distance, self._tolerance)
         return None
 
     def is_stranger(self, face_encoding: np.ndarray) -> bool:

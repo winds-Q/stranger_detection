@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import sqlite3
 import sys
@@ -19,7 +20,7 @@ if SRC_DIR not in sys.path:
 from alerter import Alerter, AsyncAlertDispatcher
 from camera import Camera
 from config_loader import Config
-from recognizer import FaceRecognizer, StrangerTracker
+from recognizer import FaceRecognizer, StrangerTracker, person_name_from_filename
 from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
 from visual import annotate_frame
@@ -248,17 +249,19 @@ class WebAppTests(unittest.TestCase):
         ok, encoded = cv2.imencode(".jpg", image)
         self.assertTrue(ok)
 
-        upload_path = os.path.join(TEST_TEMP_ROOT, "person.jpg")
+        upload_path = os.path.join(TEST_TEMP_ROOT, "张三__abc123def0.jpg")
         if os.path.exists(upload_path):
             os.remove(upload_path)
         validation = MagicMock(ok=True, message="ok")
         with patch.object(web_app, "_known_faces_dir", TEST_TEMP_ROOT), patch(
             "web.app.FaceImageValidator"
-        ) as validator_cls:
+        ) as validator_cls, patch("web.app.uuid.uuid4") as uuid4:
             validator_cls.return_value.validate.return_value = validation
+            uuid4.return_value.hex = "abc123def00000000000"
             response = self.client.post(
                 "/api/faces/upload",
                 data={
+                    "person_name": "张三",
                     "file": (
                         io.BytesIO(encoded.tobytes()),
                         "../../person.jpg",
@@ -270,6 +273,25 @@ class WebAppTests(unittest.TestCase):
         os.remove(upload_path)
 
         self.assertEqual(200, response.status_code)
+
+    def test_managed_sample_filename_preserves_person_name(self):
+        self.assertEqual("张三", person_name_from_filename("张三__abc123.jpg"))
+        self.assertEqual("legacy_person", person_name_from_filename("legacy_person.jpg"))
+
+    def test_upload_rejects_unsafe_person_name(self):
+        image = np.zeros((8, 8, 3), dtype=np.uint8)
+        _, encoded = cv2.imencode(".jpg", image)
+        with patch.object(web_app, "_known_faces_dir", TEST_TEMP_ROOT):
+            response = self.client.post(
+                "/api/faces/upload",
+                data={
+                    "person_name": "../张三",
+                    "file": (io.BytesIO(encoded.tobytes()), "face.jpg"),
+                },
+                content_type="multipart/form-data",
+            )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("姓名", response.get_json()["message"])
 
     def test_low_quality_face_upload_is_rejected_before_save(self):
         image = np.full((120, 120, 3), 127, dtype=np.uint8)
@@ -379,6 +401,15 @@ class WebAppTests(unittest.TestCase):
             self.assertEqual(b"retry: 3000\n\n", next(response.response))
         finally:
             response.close()
+
+    def test_sse_log_handler_filters_werkzeug_access_logs(self):
+        handler = web_app._SSELogHandler()
+        access_record = logging.LogRecord(
+            "werkzeug", logging.INFO, __file__, 1, "GET /api/status", (), None
+        )
+        with patch.object(web_app._log_queue, "put_nowait") as enqueue:
+            handler.emit(access_record)
+            enqueue.assert_not_called()
 
     def test_camera_scan_returns_available_devices_and_releases_all(self):
         unavailable = MagicMock()

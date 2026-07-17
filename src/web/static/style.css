@@ -248,6 +248,8 @@ button, input { font: inherit; }
 .face-item { display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 7px 9px; border-radius: 10px; transition: background .15s; }
 .face-item:hover { background: var(--surface-soft); }
 .face-item .name { overflow: hidden; flex: 1; color: #d9e0f1; text-overflow: ellipsis; white-space: nowrap; }
+.face-item .name strong { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.face-item .name small { display: block; overflow: hidden; margin-top: 2px; color: var(--muted); text-overflow: ellipsis; font-size: 9px; }
 .face-item .delete-btn { width: 25px; height: 25px; border: 0; border-radius: 7px; color: var(--danger); background: transparent; cursor: pointer; opacity: 0; transition: opacity .15s, background .15s; }
 .face-item:hover .delete-btn { opacity: 1; }
 .face-item .delete-btn:hover { background: rgba(255,100,124,.12); }
