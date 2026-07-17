@@ -10,7 +10,13 @@
 
 <div class="app">
   <header class="header">
-    <h1>陌生人检测报警系统</h1>
+    <div class="brand">
+      <div class="brand-mark">◈</div>
+      <div>
+        <h1>Sentinel Vision</h1>
+        <div class="subtitle">陌生人检测与安全告警中心</div>
+      </div>
+    </div>
     <div class="status-bar">
       <span id="statusDot" class="dot off"></span>
       <span id="statusText">未运行</span>
@@ -19,8 +25,12 @@
 
   <div class="main">
     <aside class="sidebar">
+      <div class="sidebar-inner">
       <section class="card">
-        <h3>检测控制</h3>
+        <div class="card-heading">
+          <div><h3>检测控制</h3><div class="card-description">管理摄像头检测任务</div></div>
+          <span class="section-icon">●</span>
+        </div>
         <div class="btn-group">
           <button id="btnStart" class="btn btn-green" onclick="startDetection()">启动检测</button>
           <button id="btnStop"  class="btn btn-red"   onclick="stopDetection()"  disabled>停止检测</button>
@@ -28,27 +38,34 @@
       </section>
 
       <section class="card">
-        <h3>上传熟人照片</h3>
+        <div class="card-heading">
+          <div><h3>熟人录入</h3><div class="card-description">上传清晰的单人人脸照片</div></div>
+          <span class="section-icon">＋</span>
+        </div>
         <label class="upload-btn" for="fileInput">选择照片</label>
         <input id="fileInput" type="file" accept="image/*" multiple hidden onchange="handleUpload(this)">
         <div id="uploadStatus" class="upload-status"></div>
       </section>
 
       <section class="card">
-        <h3>邮件配置</h3>
+        <div class="card-heading">
+          <div><h3>邮件告警</h3><div class="card-description">配置安全事件通知渠道</div></div>
+          <span class="section-icon">✦</span>
+        </div>
         <form id="configForm" onsubmit="return saveConfig()">
-          <div class="form-row">
-            <label class="form-label">
-              <input type="checkbox" id="cfgEnabled"> 启用报警
-            </label>
+          <div class="toggle-row">
+            <label class="form-label" for="cfgEnabled">启用邮件报警</label>
+            <input type="checkbox" id="cfgEnabled">
           </div>
-          <div class="form-row">
-            <label class="form-label">SMTP 服务器</label>
-            <input type="text" id="cfgSmtpServer" class="form-input" placeholder="smtp.qq.com">
-          </div>
-          <div class="form-row">
-            <label class="form-label">SMTP 端口</label>
-            <input type="number" id="cfgSmtpPort" class="form-input" placeholder="587">
+          <div class="form-grid form-row">
+            <div class="compact">
+              <label class="form-label">SMTP 服务器</label>
+              <input type="text" id="cfgSmtpServer" class="form-input" placeholder="smtp.qq.com">
+            </div>
+            <div class="compact">
+              <label class="form-label">端口</label>
+              <input type="number" id="cfgSmtpPort" class="form-input" placeholder="587">
+            </div>
           </div>
           <div class="form-row">
             <label class="form-label">发件邮箱</label>
@@ -72,17 +89,26 @@
       </section>
 
       <section class="card">
-        <h3>熟人列表 <span id="faceCount" class="badge"></span></h3>
+        <div class="card-heading">
+          <div><h3>熟人列表 <span id="faceCount" class="badge"></span></h3><div class="card-description">已注册的人脸样本</div></div>
+          <span class="section-icon">◎</span>
+        </div>
         <div id="faceList" class="face-list">加载中...</div>
       </section>
+      </div>
     </aside>
 
-    <section class="log-panel card">
-      <div class="log-header">
-        <h3>运行日志</h3>
-        <button id="btnClear" class="btn btn-small" onclick="clearLogs()">清屏</button>
+    <section class="workspace">
+      <div class="log-panel card">
+        <div class="log-header">
+          <div class="log-title">
+            <span class="live-mark">⌁</span>
+            <div><h3>实时运行日志</h3><div class="log-meta">系统事件与检测状态实时更新</div></div>
+          </div>
+          <button id="btnClear" class="btn btn-small" onclick="clearLogs()">清空日志</button>
+        </div>
+        <div id="logViewer" class="log-viewer"></div>
       </div>
-      <div id="logViewer" class="log-viewer"></div>
     </section>
   </div>
 </div>
