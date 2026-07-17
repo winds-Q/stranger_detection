@@ -218,7 +218,7 @@ async function stopDetection() {
     }
 }
 
-function handleUpload(input) {
+async function handleUpload(input) {
     const files = input.files;
     if (!files.length) return;
 
@@ -232,46 +232,34 @@ function handleUpload(input) {
     statusEl.classList.remove("error");
     statusEl.textContent = "上传中...";
 
-    let done = 0;
-    let failed = 0;
+    let succeeded = 0;
     const failureMessages = [];
-    for (const file of files) {
+    const selectedFiles = Array.from(files);
+    for (let index = 0; index < selectedFiles.length; index++) {
+        const file = selectedFiles[index];
+        statusEl.textContent = `正在检查第 ${index + 1}/${selectedFiles.length} 张：${file.name}`;
         const form = new FormData();
         form.append("file", file);
         form.append("person_name", personName);
-
-        fetch("/api/faces/upload", { method: "POST", body: form })
-            .then(async r => ({ ok: r.ok, data: await r.json() }))
-            .then(({ ok, data }) => {
-                done++;
-                if (!ok || !data.ok) {
-                    failed++;
-                    failureMessages.push(`${file.name}：${data.message || "上传失败"}`);
-                }
-                if (done === files.length && failed === 0) {
-                    statusEl.textContent = `已上传 ${done} 个文件`;
-                    statusEl.classList.remove("error");
-                    loadFaces();
-                    input.value = "";
-                } else if (done === files.length) {
-                    statusEl.textContent = `${done - failed} 个成功，${failed} 个失败\n${failureMessages.join("\n")}`;
-                    statusEl.classList.add("error");
-                    loadFaces();
-                    input.value = "";
-                }
-            })
-            .catch(() => {
-                done++;
-                failed++;
-                failureMessages.push(`${file.name}：网络请求失败`);
-                if (done === files.length) {
-                    statusEl.textContent = `${done - failed} 个成功，${failed} 个失败\n${failureMessages.join("\n")}`;
-                    statusEl.classList.add("error");
-                    loadFaces();
-                    input.value = "";
-                }
-            });
+        try {
+            const response = await fetch("/api/faces/upload", { method: "POST", body: form });
+            const data = await response.json();
+            if (response.ok && data.ok) {
+                succeeded++;
+            } else {
+                failureMessages.push(`${file.name}：${data.message || "上传失败"}`);
+            }
+        } catch (_) {
+            failureMessages.push(`${file.name}：无法连接 Web 服务，请确认服务仍在运行`);
+        }
     }
+    const failed = selectedFiles.length - succeeded;
+    statusEl.textContent = failed
+        ? `${succeeded} 个成功，${failed} 个失败\n${failureMessages.join("\n")}`
+        : `已上传 ${succeeded} 个文件`;
+    statusEl.classList.toggle("error", failed > 0);
+    loadFaces();
+    input.value = "";
 }
 
 async function openFacesFolder() {

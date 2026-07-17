@@ -61,7 +61,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     },
     "face_upload_validation": {
         "min_face_size": 80,
-        "min_blur_score": 60,
+        "min_blur_score": 40,
         "min_brightness": 35,
         "max_brightness": 225,
         "duplicate_image_difference": 2.0,

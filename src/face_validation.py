@@ -21,7 +21,7 @@ class FaceImageValidator:
         rules = config.get("face_upload_validation", {})
         self._known_faces_dir = known_faces_dir
         self._min_face_size = int(rules.get("min_face_size", 80))
-        self._min_blur_score = float(rules.get("min_blur_score", 60))
+        self._min_blur_score = float(rules.get("min_blur_score", 40))
         self._min_brightness = float(rules.get("min_brightness", 35))
         self._max_brightness = float(rules.get("max_brightness", 225))
         self._duplicate_image_difference = float(
@@ -35,9 +35,6 @@ class FaceImageValidator:
             return FaceValidationResult(False, "照片过暗，请在光线充足处重新拍摄")
         if brightness > self._max_brightness:
             return FaceValidationResult(False, "照片过亮，请避免强光或过度曝光")
-        if float(cv2.Laplacian(gray, cv2.CV_64F).var()) < self._min_blur_score:
-            return FaceValidationResult(False, "照片较模糊，请上传清晰、对焦准确的正脸照片")
-
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         locations = face_recognition.face_locations(rgb, model="hog")
         if not locations:
@@ -47,6 +44,13 @@ class FaceImageValidator:
         top, right, bottom, left = locations[0]
         if min(right - left, bottom - top) < self._min_face_size:
             return FaceValidationResult(False, "人脸区域过小，请上传距离更近的照片")
+        face_gray = gray[max(0, top):min(gray.shape[0], bottom), max(0, left):min(gray.shape[1], right)]
+        blur_score = float(cv2.Laplacian(face_gray, cv2.CV_64F).var())
+        if blur_score < self._min_blur_score:
+            return FaceValidationResult(
+                False,
+                f"人脸清晰度不足（当前 {blur_score:.0f}，最低 {self._min_blur_score:.0f}），请重新对焦拍摄",
+            )
 
         encodings = face_recognition.face_encodings(rgb, locations)
         if not encodings:
