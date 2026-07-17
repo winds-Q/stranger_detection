@@ -31,6 +31,7 @@ from visual import annotate_frame
 from health import RuntimeHealth
 from storage import AlertEventRepository
 from cleanup import RetentionCleaner, RetentionWorker
+from face_validation import FaceImageValidator
 
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -485,6 +486,12 @@ def api_upload():
     image = cv2.imdecode(np.frombuffer(image_data, dtype=np.uint8), cv2.IMREAD_COLOR)
     if image is None:
         return jsonify({"ok": False, "message": "文件不是有效图片"}), 400
+
+    validation = FaceImageValidator(Config(_CONFIG_PATH), _known_faces_dir).validate(
+        image, filename
+    )
+    if not validation.ok:
+        return jsonify({"ok": False, "message": validation.message}), 400
 
     os.makedirs(_known_faces_dir, exist_ok=True)
     save_path = os.path.join(_known_faces_dir, filename)

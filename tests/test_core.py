@@ -249,7 +249,11 @@ class WebAppTests(unittest.TestCase):
         upload_path = os.path.join(TEST_TEMP_ROOT, "person.jpg")
         if os.path.exists(upload_path):
             os.remove(upload_path)
-        with patch.object(web_app, "_known_faces_dir", TEST_TEMP_ROOT):
+        validation = MagicMock(ok=True, message="ok")
+        with patch.object(web_app, "_known_faces_dir", TEST_TEMP_ROOT), patch(
+            "web.app.FaceImageValidator"
+        ) as validator_cls:
+            validator_cls.return_value.validate.return_value = validation
             response = self.client.post(
                 "/api/faces/upload",
                 data={
@@ -264,6 +268,24 @@ class WebAppTests(unittest.TestCase):
         os.remove(upload_path)
 
         self.assertEqual(200, response.status_code)
+
+    def test_low_quality_face_upload_is_rejected_before_save(self):
+        image = np.full((120, 120, 3), 127, dtype=np.uint8)
+        ok, encoded = cv2.imencode(".jpg", image)
+        self.assertTrue(ok)
+        validation = MagicMock(ok=False, message="照片较模糊")
+        with patch.object(web_app, "_known_faces_dir", TEST_TEMP_ROOT), patch(
+            "web.app.FaceImageValidator"
+        ) as validator_cls:
+            validator_cls.return_value.validate.return_value = validation
+            response = self.client.post(
+                "/api/faces/upload",
+                data={"file": (io.BytesIO(encoded.tobytes()), "bad-face.jpg")},
+                content_type="multipart/form-data",
+            )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("模糊", response.get_json()["message"])
+        self.assertFalse(os.path.exists(os.path.join(TEST_TEMP_ROOT, "bad-face.jpg")))
 
     def test_start_reports_camera_failure(self):
         with patch.object(web_app, "Camera", side_effect=RuntimeError("camera unavailable")):

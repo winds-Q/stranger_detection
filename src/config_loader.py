@@ -60,6 +60,13 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "events_days": 30,
         "cleanup_interval_hours": 12,
     },
+    "face_upload_validation": {
+        "min_face_size": 80,
+        "min_blur_score": 60,
+        "min_brightness": 35,
+        "max_brightness": 225,
+        "duplicate_tolerance": 0.42,
+    },
 }
 
 
