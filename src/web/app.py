@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -357,6 +358,13 @@ def api_get_config():
     if env_password:
         password = env_password
     masked = "****" if password else ""
+    receiver_value = alert_cfg.get(
+        "receiver_emails",
+        alert_cfg.get("receiver_email", ""),
+    )
+    if isinstance(receiver_value, list):
+        receiver_value = ", ".join(str(item) for item in receiver_value)
+
     return jsonify({
         "enabled": alert_cfg.get("enabled", True),
         "cooldown_seconds": alert_cfg.get("cooldown_seconds", 180),
@@ -364,7 +372,7 @@ def api_get_config():
         "smtp_port": alert_cfg.get("smtp_port", 587),
         "sender_email": alert_cfg.get("sender_email", ""),
         "sender_password": masked,
-        "receiver_email": alert_cfg.get("receiver_email", ""),
+        "receiver_email": receiver_value,
         "has_env_password": bool(env_password),
     })
 
@@ -401,7 +409,20 @@ def api_update_config():
     if "sender_password" in data and data["sender_password"] and data["sender_password"] != "****":
         alert_cfg["sender_password"] = str(data["sender_password"])
     if "receiver_email" in data:
-        alert_cfg["receiver_email"] = str(data["receiver_email"])
+        receiver_text = str(data["receiver_email"])
+        receivers = Alerter._normalize_receivers(receiver_text)
+        raw_receivers = [
+            item.strip()
+            for item in re.split(r"[,;\n]", receiver_text)
+            if item.strip()
+        ]
+        if any(not Alerter._normalize_receivers(item) for item in raw_receivers):
+            return jsonify({
+                "ok": False,
+                "message": "一个或多个收件邮箱格式不正确",
+            }), 400
+        alert_cfg["receiver_emails"] = receivers
+        alert_cfg.pop("receiver_email", None)
 
     _save_yaml_config(cfg)
     return jsonify({"ok": True, "message": "配置已保存"})

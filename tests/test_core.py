@@ -85,6 +85,34 @@ class AlerterTests(unittest.TestCase):
         self.assertTrue(alerter.send_alert(np.zeros((8, 8, 3), dtype=np.uint8)))
         smtp_ssl.assert_called_once_with("smtp.example.com", 465, timeout=15)
 
+    @patch("alerter.smtplib.SMTP")
+    def test_sends_one_alert_to_multiple_receivers(self, smtp):
+        smtp.return_value = MagicMock()
+        config = self._config(TEST_TEMP_ROOT)
+        config._data["alert"]["receiver_emails"] = [
+            "first@example.com",
+            "second@example.com",
+            "FIRST@example.com",
+        ]
+        alerter = Alerter(config)
+
+        self.assertTrue(alerter.send_alert(np.zeros((8, 8, 3), dtype=np.uint8)))
+
+        sendmail_args = smtp.return_value.sendmail.call_args.args
+        self.assertEqual(
+            ["first@example.com", "second@example.com"],
+            sendmail_args[1],
+        )
+
+    def test_parses_comma_semicolon_and_newline_receiver_text(self):
+        self.assertEqual(
+            ["a@example.com", "b@example.com", "c@example.com"],
+            Alerter._normalize_receivers(
+                "a@example.com, b@example.com;c@example.com\nA@example.com"
+            ),
+        )
+        self.assertEqual([], Alerter._normalize_receivers("not-an-email"))
+
 
 class AsyncAlertDispatcherTests(unittest.TestCase):
     def test_dispatches_in_background_and_retries_failure(self):
@@ -231,6 +259,30 @@ class WebAppTests(unittest.TestCase):
             "/api/config",
             json={"smtp_port": 70000, "cooldown_seconds": -1},
         )
+        self.assertEqual(400, response.status_code)
+
+    def test_config_api_accepts_multiple_receiver_addresses(self):
+        with patch.object(web_app, "_load_yaml_config", return_value={}), patch.object(
+            web_app, "_save_yaml_config"
+        ) as save_config:
+            response = self.client.post(
+                "/api/config",
+                json={"receiver_email": "a@example.com; b@example.com"},
+            )
+
+        self.assertEqual(200, response.status_code)
+        saved = save_config.call_args.args[0]
+        self.assertEqual(
+            ["a@example.com", "b@example.com"],
+            saved["alert"]["receiver_emails"],
+        )
+
+    def test_config_api_rejects_invalid_receiver_address(self):
+        with patch.object(web_app, "_load_yaml_config", return_value={}):
+            response = self.client.post(
+                "/api/config",
+                json={"receiver_email": "valid@example.com, invalid"},
+            )
         self.assertEqual(400, response.status_code)
 
     def test_log_stream_declares_reconnect_delay(self):

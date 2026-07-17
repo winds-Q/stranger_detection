@@ -42,7 +42,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "smtp_port": 587,
         "sender_email": "",
         "sender_password": "",
-        "receiver_email": "",
+        "receiver_emails": [],
         "queue_size": 20,
         "retry_count": 2,
         "retry_backoff_seconds": 2,

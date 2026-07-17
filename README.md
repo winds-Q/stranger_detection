@@ -7,6 +7,7 @@
 - 📷 实时摄像头采集 + 人脸检测
 - 🧑‍🤝‍🧑 熟人注册与识别（欧氏距离比对）
 - 📧 陌生人报警邮件（附截图）
+- 👥 支持同时向多个目标邮箱发送报警
 - 🖥️ Web UI 管理界面（暗色主题）
 - ⏱️ 报警冷却机制，防止重复发送
 - 🧭 按陌生人临时身份分别冷却，不同陌生人互不影响
@@ -30,7 +31,9 @@ pip install -r requirements.txt
 alert:
   sender_email: "your_email@gmail.com"
   sender_password: ""        # 或设环境变量 STRANGER_DETECTION_SMTP_PASSWORD
-  receiver_email: "receiver@example.com"
+  receiver_emails:
+    - "first@example.com"
+    - "second@example.com"
 ```
 
 ### 3. 注册熟人

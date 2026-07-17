@@ -2,6 +2,7 @@ import glob
 import logging
 import os
 import queue
+import re
 import smtplib
 import threading
 import time
@@ -28,7 +29,13 @@ class Alerter:
         env_password = os.environ.get("STRANGER_DETECTION_SMTP_PASSWORD")
         if env_password:
             self._sender_password = env_password
-        self._receiver_email = alert_cfg.get("receiver_email", "")
+        self._receiver_emails = self._normalize_receivers(
+            alert_cfg.get("receiver_emails", [])
+        )
+        if not self._receiver_emails:
+            self._receiver_emails = self._normalize_receivers(
+                alert_cfg.get("receiver_email", "")
+            )
 
         snapshot_cfg = config.snapshot
         self._snapshot_dir = os.path.abspath(snapshot_cfg.get("save_to", "./snapshots/"))
@@ -76,7 +83,7 @@ class Alerter:
         if not bypass_cooldown:
             self._last_alert_times[stranger_id] = now
 
-        if not self._sender_email or not self._receiver_email:
+        if not self._sender_email or not self._receiver_emails:
             logger.warning("邮件发送方或接收方未配置，截图已保存但跳过邮件")
             return False
         if not self._sender_password:
@@ -86,7 +93,7 @@ class Alerter:
         msg = MIMEMultipart()
         msg["Subject"] = f"[陌生人警报] 检测到陌生人 ({stranger_id})"
         msg["From"] = self._sender_email
-        msg["To"] = self._receiver_email
+        msg["To"] = ", ".join(self._receiver_emails)
 
         html = self._build_html(stranger_id)
         msg.attach(MIMEText(html, "html", "utf-8"))
@@ -108,7 +115,11 @@ class Alerter:
                 server.starttls()
                 server.ehlo()
             server.login(self._sender_email, self._sender_password)
-            server.sendmail(self._sender_email, self._receiver_email, msg.as_string())
+            server.sendmail(
+                self._sender_email,
+                self._receiver_emails,
+                msg.as_string(),
+            )
         except (smtplib.SMTPException, OSError) as e:
             logger.error("邮件发送失败: %s", e)
             return False
@@ -119,7 +130,7 @@ class Alerter:
                 except (smtplib.SMTPException, OSError):
                     logger.debug("关闭 SMTP 连接失败", exc_info=True)
 
-        logger.info("报警邮件已发送至 %s", self._receiver_email)
+        logger.info("报警邮件已发送至 %d 个收件地址", len(self._receiver_emails))
         return True
 
     @property
@@ -127,9 +138,32 @@ class Alerter:
         return bool(
             self._enabled
             and self._sender_email
-            and self._receiver_email
+            and self._receiver_emails
             and self._sender_password
         )
+
+    @staticmethod
+    def _normalize_receivers(value) -> list[str]:
+        if isinstance(value, str):
+            candidates = re.split(r"[,;\n]", value)
+        elif isinstance(value, (list, tuple, set)):
+            candidates = value
+        else:
+            candidates = []
+
+        receivers = []
+        seen = set()
+        for candidate in candidates:
+            address = str(candidate).strip()
+            key = address.lower()
+            if (
+                address
+                and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", address)
+                and key not in seen
+            ):
+                receivers.append(address)
+                seen.add(key)
+        return receivers
 
     def _save_snapshot(self, image_data: bytes) -> None:
         """保存陌生人截图到本地，超出 max_snapshots 时自动清理旧截图。"""

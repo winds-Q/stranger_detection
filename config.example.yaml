@@ -32,7 +32,9 @@ alert:
   smtp_port: 587
   sender_email: "your_email@qq.com"
   sender_password: ""
-  receiver_email: "receiver@example.com"
+  receiver_emails:
+    - "first@example.com"
+    - "second@example.com"
   queue_size: 20
   retry_count: 2
   retry_backoff_seconds: 2
