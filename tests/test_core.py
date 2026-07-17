@@ -163,6 +163,25 @@ class StrangerTrackerTests(unittest.TestCase):
         self.assertEqual(first_id, tracker.identify(face_a_changed))
         self.assertNotEqual(first_id, tracker.identify(face_b))
 
+    def test_retains_multiple_recent_samples_without_unbounded_growth(self):
+        tracker = StrangerTracker(tolerance=0.5, max_samples=3)
+        stranger_id = tracker.identify(np.zeros(128))
+
+        for value in (0.01, 0.02, 0.03, 0.04):
+            self.assertEqual(
+                stranger_id,
+                tracker.identify(np.full(128, value)),
+            )
+
+        self.assertEqual(3, tracker.sample_count(stranger_id))
+
+    def test_matches_any_sample_in_identity_history(self):
+        tracker = StrangerTracker(tolerance=0.5, max_samples=5)
+        stranger_id = tracker.identify(np.zeros(128))
+        tracker.identify(np.full(128, 0.04))
+
+        self.assertEqual(stranger_id, tracker.identify(np.zeros(128)))
+
 
 class FrameProcessingControllerTests(unittest.TestCase):
     def test_skips_frames_and_limits_detection_fps(self):

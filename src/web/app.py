@@ -96,6 +96,7 @@ def _detection_loop(config):
             retention_seconds=config.recognition.get(
                 "stranger_retention_seconds", 3600
             ),
+            max_samples=config.recognition.get("stranger_max_samples", 5),
         )
         alerter = Alerter(config)
         processor = FrameProcessingController(**config.processing)

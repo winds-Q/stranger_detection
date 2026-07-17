@@ -18,6 +18,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "model": "hog",
         "stranger_tolerance": 0.5,
         "stranger_retention_seconds": 3600,
+        "stranger_max_samples": 5,
     },
     "processing": {
         "detect_every_n_frames": 3,

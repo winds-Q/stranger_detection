@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from collections import deque
 from typing import List
 
 import face_recognition
@@ -79,10 +80,12 @@ class StrangerTracker:
         tolerance: float = 0.5,
         retention_seconds: int = 3600,
         max_entries: int = 200,
+        max_samples: int = 5,
     ):
         self._tolerance = tolerance
         self._retention_seconds = retention_seconds
         self._max_entries = max_entries
+        self._max_samples = max(1, int(max_samples))
         self._entries = {}
         self._next_id = 1
 
@@ -91,27 +94,27 @@ class StrangerTracker:
         self._remove_expired(now)
 
         if self._entries:
-            stranger_ids = list(self._entries)
-            encodings = [
-                self._entries[stranger_id]["encoding"]
-                for stranger_id in stranger_ids
-            ]
+            sample_owners = []
+            encodings = []
+            for stranger_id, entry in self._entries.items():
+                for sample in entry["encodings"]:
+                    sample_owners.append(stranger_id)
+                    encodings.append(sample)
             distances = face_recognition.face_distance(encodings, face_encoding)
             matched_index = int(np.argmin(distances))
             if distances[matched_index] <= self._tolerance:
-                stranger_id = stranger_ids[matched_index]
+                stranger_id = sample_owners[matched_index]
                 entry = self._entries[stranger_id]
-                # 轻微融合最新编码，降低角度和光线变化造成的身份漂移。
-                entry["encoding"] = (
-                    entry["encoding"] * 0.8 + face_encoding * 0.2
-                )
+                entry["encodings"].append(face_encoding.copy())
                 entry["last_seen"] = now
                 return stranger_id
 
         stranger_id = f"stranger-{self._next_id}"
         self._next_id += 1
         self._entries[stranger_id] = {
-            "encoding": face_encoding.copy(),
+            "encodings": deque(
+                [face_encoding.copy()], maxlen=self._max_samples
+            ),
             "last_seen": now,
         }
         self._trim_oldest()
@@ -134,3 +137,7 @@ class StrangerTracker:
                 key=lambda stranger_id: self._entries[stranger_id]["last_seen"],
             )
             del self._entries[oldest_id]
+
+    def sample_count(self, stranger_id: str) -> int:
+        entry = self._entries.get(stranger_id)
+        return len(entry["encodings"]) if entry else 0
