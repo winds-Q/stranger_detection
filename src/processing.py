@@ -1,4 +1,5 @@
 import time
+from collections import deque
 from typing import List, Tuple
 
 import cv2
@@ -59,3 +60,48 @@ class FrameProcessingController:
             tuple(int(round(value * factor)) for value in location)
             for location in locations
         ]
+
+
+class StrangerConfirmation:
+    """要求陌生人在时间窗口内连续多次出现后才确认。"""
+
+    def __init__(
+        self,
+        window_seconds: float = 3,
+        required_hits: int = 4,
+        minimum_duration_seconds: float = 1,
+        clock=time.monotonic,
+    ):
+        self._window_seconds = max(0.1, float(window_seconds))
+        self._required_hits = max(1, int(required_hits))
+        self._minimum_duration_seconds = max(
+            0.0, float(minimum_duration_seconds)
+        )
+        self._clock = clock
+        self._hits = {}
+
+    def observe(self, stranger_id: str) -> bool:
+        now = self._clock()
+        hits = self._hits.setdefault(stranger_id, deque())
+        hits.append(now)
+        self._prune(hits, now)
+        return (
+            len(hits) >= self._required_hits
+            and now - hits[0] >= self._minimum_duration_seconds
+        )
+
+    def cleanup(self) -> None:
+        now = self._clock()
+        for stranger_id in list(self._hits):
+            hits = self._hits[stranger_id]
+            self._prune(hits, now)
+            if not hits:
+                del self._hits[stranger_id]
+
+    def reset(self, stranger_id: str) -> None:
+        self._hits.pop(stranger_id, None)
+
+    def _prune(self, hits: deque, now: float) -> None:
+        cutoff = now - self._window_seconds
+        while hits and hits[0] < cutoff:
+            hits.popleft()

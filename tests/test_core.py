@@ -17,7 +17,7 @@ if SRC_DIR not in sys.path:
 from alerter import Alerter
 from config_loader import Config
 from recognizer import StrangerTracker
-from processing import FrameProcessingController
+from processing import FrameProcessingController, StrangerConfirmation
 from web import app as web_app
 
 
@@ -190,6 +190,37 @@ class FrameProcessingControllerTests(unittest.TestCase):
         self.assertEqual([(20, 40, 60, 10)], controller.restore_locations([
             (10, 20, 30, 5)
         ]))
+
+
+class StrangerConfirmationTests(unittest.TestCase):
+    def test_requires_enough_hits_and_minimum_duration(self):
+        now = [0.0]
+        confirmation = StrangerConfirmation(
+            window_seconds=3,
+            required_hits=3,
+            minimum_duration_seconds=1,
+            clock=lambda: now[0],
+        )
+
+        self.assertFalse(confirmation.observe("stranger-1"))
+        now[0] = 0.5
+        self.assertFalse(confirmation.observe("stranger-1"))
+        now[0] = 1.0
+        self.assertTrue(confirmation.observe("stranger-1"))
+
+    def test_confirmation_is_independent_and_old_hits_expire(self):
+        now = [0.0]
+        confirmation = StrangerConfirmation(
+            window_seconds=1,
+            required_hits=2,
+            minimum_duration_seconds=0,
+            clock=lambda: now[0],
+        )
+
+        self.assertFalse(confirmation.observe("stranger-1"))
+        self.assertFalse(confirmation.observe("stranger-2"))
+        now[0] = 2.0
+        self.assertFalse(confirmation.observe("stranger-1"))
 
 
 if __name__ == "__main__":

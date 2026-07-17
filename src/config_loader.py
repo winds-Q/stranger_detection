@@ -24,6 +24,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "max_detection_fps": 4,
         "detection_scale": 0.5,
     },
+    "detection_confirmation": {
+        "window_seconds": 3,
+        "required_hits": 4,
+        "minimum_duration_seconds": 1,
+    },
     "alert": {
         "enabled": True,
         "cooldown_seconds": 180,
@@ -78,6 +83,10 @@ class Config:
     @property
     def processing(self) -> Dict[str, Any]:
         return self._data["processing"]
+
+    @property
+    def detection_confirmation(self) -> Dict[str, Any]:
+        return self._data["detection_confirmation"]
 
     @property
     def alert(self) -> Dict[str, Any]:

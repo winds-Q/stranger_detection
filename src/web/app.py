@@ -20,7 +20,7 @@ from recognizer import FaceRecognizer, StrangerTracker
 from alerter import Alerter
 from config_loader import Config
 from logger import setup_logger
-from processing import FrameProcessingController
+from processing import FrameProcessingController, StrangerConfirmation
 
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -98,6 +98,7 @@ def _detection_loop(config):
         )
         alerter = Alerter(config)
         processor = FrameProcessingController(**config.processing)
+        confirmation = StrangerConfirmation(**config.detection_confirmation)
         _detection_error = None
         _startup_event.set()
         _log.info("检测已启动")
@@ -130,7 +131,10 @@ def _detection_loop(config):
             for encoding in face_encodings:
                 if recognizer.is_stranger(encoding):
                     stranger_id = stranger_tracker.identify(encoding)
-                    alerter.send_alert(frame, stranger_id)
+                    if confirmation.observe(stranger_id):
+                        alerter.send_alert(frame, stranger_id)
+
+            confirmation.cleanup()
 
             time.sleep(0.1)
     except Exception as exc:
