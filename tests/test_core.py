@@ -3,6 +3,7 @@ import os
 import sqlite3
 import sys
 import unittest
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import cv2
@@ -24,6 +25,7 @@ from events import StrangerEventManager
 from visual import annotate_frame
 from health import RuntimeHealth
 from storage import AlertEventRepository
+from cleanup import RetentionCleaner
 from web import app as web_app
 
 
@@ -573,6 +575,50 @@ class AlertEventRepositoryTests(unittest.TestCase):
         self.assertEqual(1, repository.get_event(event_id)["handled"])
         self.assertEqual({"snapshot_path": None}, repository.delete_event(event_id))
         self.assertEqual(0, repository.count())
+
+
+class RetentionCleanerTests(unittest.TestCase):
+    def test_deletes_old_supported_files_and_database_events(self):
+        database_path = os.path.join(TEST_TEMP_ROOT, "cleanup_alerts.db")
+        snapshot_path = os.path.join(TEST_TEMP_ROOT, "cleanup_old.jpg")
+        log_path = os.path.join(TEST_TEMP_ROOT, "cleanup_old.log")
+        for path in (database_path, snapshot_path, log_path):
+            if os.path.exists(path):
+                os.remove(path)
+        repository = AlertEventRepository(database_path)
+        repository.record_observation("cleanup-event", "stranger-cleanup")
+        connection = sqlite3.connect(database_path)
+        try:
+            connection.execute(
+                "UPDATE alert_events SET created_at = '2000-01-01T00:00:00'"
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        with open(snapshot_path, "wb") as output:
+            output.write(b"image")
+        with open(log_path, "w", encoding="utf-8") as output:
+            output.write("log")
+        old_time = datetime.now().timestamp() - 86400
+        os.utime(snapshot_path, (old_time, old_time))
+        os.utime(log_path, (old_time, old_time))
+        cleaner = RetentionCleaner(
+            repository,
+            TEST_TEMP_ROOT,
+            TEST_TEMP_ROOT,
+            snapshots_days=0,
+            logs_days=0,
+            events_days=0,
+        )
+
+        result = cleaner.run_once()
+
+        self.assertGreaterEqual(result["snapshots_deleted"], 1)
+        self.assertGreaterEqual(result["logs_deleted"], 1)
+        self.assertEqual(0, repository.count())
+        for path in (database_path, snapshot_path, log_path):
+            if os.path.exists(path):
+                os.remove(path)
 
 
 if __name__ == "__main__":

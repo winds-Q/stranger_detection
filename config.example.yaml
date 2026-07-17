@@ -45,3 +45,9 @@ snapshot:
 
 database:
   path: "./data/alerts.db"
+
+retention:
+  snapshots_days: 7
+  logs_days: 14
+  events_days: 30
+  cleanup_interval_hours: 12

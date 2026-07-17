@@ -129,6 +129,22 @@ class AlertEventRepository:
             connection.execute("DELETE FROM alert_events WHERE id = ?", (event_id,))
             return {"snapshot_path": row["snapshot_path"]}
 
+    def delete_older_than(self, cutoff_iso: str):
+        with self._lock, closing(self._connect()) as connection, connection:
+            rows = connection.execute(
+                "SELECT snapshot_path FROM alert_events WHERE created_at < ?",
+                (cutoff_iso,),
+            ).fetchall()
+            cursor = connection.execute(
+                "DELETE FROM alert_events WHERE created_at < ?", (cutoff_iso,)
+            )
+            return {
+                "count": cursor.rowcount,
+                "snapshot_paths": [
+                    row["snapshot_path"] for row in rows if row["snapshot_path"]
+                ],
+            }
+
     @staticmethod
     def _now() -> str:
         return datetime.now().isoformat(timespec="seconds")

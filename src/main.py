@@ -15,6 +15,7 @@ from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
 from visual import annotate_frame
 from storage import AlertEventRepository
+from cleanup import RetentionCleaner, RetentionWorker
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,18 @@ def main():
     if not os.path.isabs(database_path):
         database_path = os.path.join(PROJECT_ROOT, database_path)
     event_repository = AlertEventRepository(database_path)
+    retention_worker = RetentionWorker(
+        RetentionCleaner(
+            event_repository,
+            snapshot_dir=os.path.join(PROJECT_ROOT, "snapshots"),
+            log_dir=os.path.join(PROJECT_ROOT, "logs"),
+            snapshots_days=config.retention.get("snapshots_days", 7),
+            logs_days=config.retention.get("logs_days", 14),
+            events_days=config.retention.get("events_days", 30),
+        ),
+        interval_hours=config.retention.get("cleanup_interval_hours", 12),
+    )
+    retention_worker.start()
 
     camera = Camera(
         device_id=config.camera["device_id"],
@@ -132,6 +145,7 @@ def main():
     finally:
         camera.release()
         alert_dispatcher.close()
+        retention_worker.close()
         logger.info("系统已退出")
 
 

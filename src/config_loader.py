@@ -54,6 +54,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "database": {
         "path": "./data/alerts.db",
     },
+    "retention": {
+        "snapshots_days": 7,
+        "logs_days": 14,
+        "events_days": 30,
+        "cleanup_interval_hours": 12,
+    },
 }
 
 
@@ -115,6 +121,10 @@ class Config:
     @property
     def database(self) -> Dict[str, Any]:
         return self._data["database"]
+
+    @property
+    def retention(self) -> Dict[str, Any]:
+        return self._data["retention"]
 
     def get(self, key: str, default: Any = None) -> Any:
         return self._data.get(key, default)

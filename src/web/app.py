@@ -30,6 +30,7 @@ from events import StrangerEventManager
 from visual import annotate_frame
 from health import RuntimeHealth
 from storage import AlertEventRepository
+from cleanup import RetentionCleaner, RetentionWorker
 
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -628,9 +629,26 @@ def main():
     setup_logger(log_dir=os.path.join(PROJECT_ROOT, "logs"))
     logging.getLogger().setLevel(logging.INFO)
     _init_sse_handler()
+    cleanup_config = Config(_CONFIG_PATH)
+    cleaner = RetentionCleaner(
+        _event_repository,
+        snapshot_dir=os.path.join(PROJECT_ROOT, "snapshots"),
+        log_dir=os.path.join(PROJECT_ROOT, "logs"),
+        snapshots_days=cleanup_config.retention.get("snapshots_days", 7),
+        logs_days=cleanup_config.retention.get("logs_days", 14),
+        events_days=cleanup_config.retention.get("events_days", 30),
+    )
+    retention_worker = RetentionWorker(
+        cleaner,
+        interval_hours=cleanup_config.retention.get("cleanup_interval_hours", 12),
+    )
+    retention_worker.start()
     host = os.environ.get("STRANGER_DETECTION_WEB_HOST", "127.0.0.1")
     port = int(os.environ.get("STRANGER_DETECTION_WEB_PORT", "5050"))
-    app.run(host=host, port=port, debug=False, threaded=True)
+    try:
+        app.run(host=host, port=port, debug=False, threaded=True)
+    finally:
+        retention_worker.close()
 
 
 if __name__ == "__main__":
