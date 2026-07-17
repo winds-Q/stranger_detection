@@ -22,6 +22,7 @@ from config_loader import Config
 from logger import setup_logger
 from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
+from visual import annotate_frame
 
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -133,13 +134,25 @@ def _detection_loop(config):
                 continue
 
             face_encodings = detector.encode(detection_frame, face_locations)
-            for encoding in face_encodings:
-                if recognizer.is_stranger(encoding):
+            original_locations = processor.restore_locations(face_locations)
+            annotations = []
+            alert_event_ids = []
+            for encoding, location in zip(face_encodings, original_locations):
+                known_name = recognizer.recognize(encoding)
+                if known_name is None:
                     stranger_id = stranger_tracker.identify(encoding)
+                    annotations.append((location, stranger_id, True))
                     confirmed = confirmation.observe(stranger_id)
                     event_id = event_manager.observe(stranger_id, confirmed)
                     if event_id:
-                        alerter.send_alert(frame, event_id)
+                        alert_event_ids.append(event_id)
+                else:
+                    annotations.append((location, known_name, False))
+
+            if alert_event_ids:
+                alert_frame = annotate_frame(frame, annotations)
+                for event_id in alert_event_ids:
+                    alerter.send_alert(alert_frame, event_id)
 
             confirmation.cleanup()
             for departed_id in event_manager.mark_departures():

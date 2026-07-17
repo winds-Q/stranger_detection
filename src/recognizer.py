@@ -2,7 +2,7 @@ import logging
 import os
 import time
 from collections import deque
-from typing import List
+from typing import List, Optional
 
 import face_recognition
 import numpy as np
@@ -48,9 +48,9 @@ class FaceRecognizer:
             len(self._known_names), tolerance
         )
 
-    def is_stranger(self, face_encoding: np.ndarray) -> bool:
+    def recognize(self, face_encoding: np.ndarray) -> Optional[str]:
         if not self._known_encodings:
-            return True
+            return None
 
         distances = face_recognition.face_distance(
             self._known_encodings, face_encoding
@@ -62,10 +62,13 @@ class FaceRecognizer:
             logger.debug(
                 "匹配熟人 %s (距离=%.4f)", self._known_names[matched_index], min_distance
             )
-            return False
+            return self._known_names[matched_index]
 
         logger.info("检测到陌生人 (最短距离=%.4f > tolerance=%.2f)", min_distance, self._tolerance)
-        return True
+        return None
+
+    def is_stranger(self, face_encoding: np.ndarray) -> bool:
+        return self.recognize(face_encoding) is None
 
     @property
     def known_count(self) -> int:

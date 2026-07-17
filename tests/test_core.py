@@ -19,6 +19,7 @@ from config_loader import Config
 from recognizer import StrangerTracker
 from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
+from visual import annotate_frame
 from web import app as web_app
 
 
@@ -275,6 +276,19 @@ class StrangerEventManagerTests(unittest.TestCase):
 
         self.assertEqual(["stranger-1"], manager.mark_departures())
         self.assertFalse(manager.get_event("stranger-1").active)
+
+
+class VisualAnnotationTests(unittest.TestCase):
+    def test_draws_red_and_green_face_annotations_on_copy(self):
+        frame = np.zeros((100, 160, 3), dtype=np.uint8)
+        annotated = annotate_frame(frame, [
+            ((20, 60, 70, 10), "stranger-1", True),
+            ((20, 140, 70, 90), "alice", False),
+        ])
+
+        self.assertFalse(np.any(frame))
+        self.assertGreater(int(annotated[:, :, 2].max()), 0)
+        self.assertGreater(int(annotated[:, :, 1].max()), 0)
 
 
 if __name__ == "__main__":
