@@ -29,6 +29,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "required_hits": 4,
         "minimum_duration_seconds": 1,
     },
+    "stranger_tracking": {
+        "leave_timeout_seconds": 30,
+    },
     "alert": {
         "enabled": True,
         "cooldown_seconds": 180,
@@ -87,6 +90,10 @@ class Config:
     @property
     def detection_confirmation(self) -> Dict[str, Any]:
         return self._data["detection_confirmation"]
+
+    @property
+    def stranger_tracking(self) -> Dict[str, Any]:
+        return self._data["stranger_tracking"]
 
     @property
     def alert(self) -> Dict[str, Any]:

@@ -12,6 +12,7 @@ from alerter import Alerter
 from config_loader import Config
 from logger import setup_logger
 from processing import FrameProcessingController, StrangerConfirmation
+from events import StrangerEventManager
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ def main():
     alerter = Alerter(config)
     processor = FrameProcessingController(**config.processing)
     confirmation = StrangerConfirmation(**config.detection_confirmation)
+    event_manager = StrangerEventManager(**config.stranger_tracking)
 
     logger.info("陌生人检测系统已启动 (config=%s)", config_path)
 
@@ -66,6 +68,8 @@ def main():
             detection_frame = processor.prepare_frame(frame)
             face_locations = detector.detect(detection_frame)
             if not face_locations:
+                for departed_id in event_manager.mark_departures():
+                    confirmation.reset(departed_id)
                 time.sleep(0.05)
                 continue
 
@@ -74,10 +78,14 @@ def main():
             for encoding in face_encodings:
                 if recognizer.is_stranger(encoding):
                     stranger_id = stranger_tracker.identify(encoding)
-                    if confirmation.observe(stranger_id):
-                        alerter.send_alert(frame, stranger_id)
+                    confirmed = confirmation.observe(stranger_id)
+                    event_id = event_manager.observe(stranger_id, confirmed)
+                    if event_id:
+                        alerter.send_alert(frame, event_id)
 
             confirmation.cleanup()
+            for departed_id in event_manager.mark_departures():
+                confirmation.reset(departed_id)
 
             time.sleep(0.1)
 

@@ -19,6 +19,9 @@ detection_confirmation:
   required_hits: 4
   minimum_duration_seconds: 1
 
+stranger_tracking:
+  leave_timeout_seconds: 30
+
 alert:
   enabled: true
   cooldown_seconds: 180

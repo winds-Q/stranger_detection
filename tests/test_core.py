@@ -18,6 +18,7 @@ from alerter import Alerter
 from config_loader import Config
 from recognizer import StrangerTracker
 from processing import FrameProcessingController, StrangerConfirmation
+from events import StrangerEventManager
 from web import app as web_app
 
 
@@ -221,6 +222,40 @@ class StrangerConfirmationTests(unittest.TestCase):
         self.assertFalse(confirmation.observe("stranger-2"))
         now[0] = 2.0
         self.assertFalse(confirmation.observe("stranger-1"))
+
+
+class StrangerEventManagerTests(unittest.TestCase):
+    def test_tracks_stay_departure_and_reentry(self):
+        now = [0.0]
+        manager = StrangerEventManager(
+            leave_timeout_seconds=30,
+            clock=lambda: now[0],
+        )
+
+        self.assertIsNone(manager.observe("stranger-1", confirmed=False))
+        self.assertEqual(
+            "stranger-1-event-1",
+            manager.observe("stranger-1", confirmed=True),
+        )
+        now[0] = 20
+        self.assertEqual(
+            "stranger-1-event-1",
+            manager.observe("stranger-1", confirmed=True),
+        )
+        now[0] = 51
+        self.assertEqual(
+            "stranger-1-event-2",
+            manager.observe("stranger-1", confirmed=True),
+        )
+
+    def test_marks_departed_strangers(self):
+        now = [0.0]
+        manager = StrangerEventManager(leave_timeout_seconds=5, clock=lambda: now[0])
+        manager.observe("stranger-1", confirmed=True)
+        now[0] = 6
+
+        self.assertEqual(["stranger-1"], manager.mark_departures())
+        self.assertFalse(manager.get_event("stranger-1").active)
 
 
 if __name__ == "__main__":
