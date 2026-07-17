@@ -12,6 +12,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "device_id": 0,
         "width": 640,
         "height": 480,
+        "read_failure_threshold": 10,
+        "reconnect_interval_seconds": 5,
     },
     "recognition": {
         "tolerance": 0.5,

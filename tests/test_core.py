@@ -15,6 +15,7 @@ if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
 from alerter import Alerter
+from camera import Camera
 from config_loader import Config
 from recognizer import StrangerTracker
 from processing import FrameProcessingController, StrangerConfirmation
@@ -83,6 +84,38 @@ class AlerterTests(unittest.TestCase):
 
         self.assertTrue(alerter.send_alert(np.zeros((8, 8, 3), dtype=np.uint8)))
         smtp_ssl.assert_called_once_with("smtp.example.com", 465, timeout=15)
+
+
+class CameraTests(unittest.TestCase):
+    def test_reconnects_after_consecutive_read_failures(self):
+        frame = np.ones((4, 4, 3), dtype=np.uint8)
+        first_capture = MagicMock()
+        first_capture.isOpened.return_value = True
+        first_capture.read.side_effect = [(False, None), (False, None)]
+        first_capture.get.side_effect = [640, 480]
+        second_capture = MagicMock()
+        second_capture.isOpened.return_value = True
+        second_capture.read.return_value = (True, frame)
+        second_capture.get.side_effect = [640, 480]
+        factory = MagicMock(side_effect=[first_capture, second_capture])
+        now = [0.0]
+        camera = Camera(
+            read_failure_threshold=2,
+            reconnect_interval_seconds=5,
+            capture_factory=factory,
+            clock=lambda: now[0],
+        )
+
+        self.assertIsNone(camera.get_frame())
+        self.assertIsNone(camera.get_frame())
+        self.assertFalse(camera.is_opened())
+        now[0] = 4.9
+        self.assertIsNone(camera.get_frame())
+        self.assertEqual(1, factory.call_count)
+        now[0] = 5.0
+        self.assertTrue(np.array_equal(frame, camera.get_frame()))
+        self.assertEqual(2, factory.call_count)
+        camera.release()
 
 
 class WebAppTests(unittest.TestCase):

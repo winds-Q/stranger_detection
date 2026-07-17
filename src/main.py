@@ -33,6 +33,10 @@ def main():
         device_id=config.camera["device_id"],
         width=config.camera.get("width", 640),
         height=config.camera.get("height", 480),
+        read_failure_threshold=config.camera.get("read_failure_threshold", 10),
+        reconnect_interval_seconds=config.camera.get(
+            "reconnect_interval_seconds", 5
+        ),
     )
     detector = FaceDetector(
         model=config.recognition.get("model", "hog"),
