@@ -63,6 +63,9 @@ def main():
     recognizer = FaceRecognizer(
         known_faces_dir=os.path.join(PROJECT_ROOT, "known_faces"),
         tolerance=config.recognition.get("tolerance", 0.5),
+        cache_path=config.resolve_path(
+            config.database.get("face_cache_path", "./data/face_encodings.db")
+        ),
     )
     stranger_tracker = StrangerTracker(
         tolerance=config.recognition.get("stranger_tolerance", 0.5),

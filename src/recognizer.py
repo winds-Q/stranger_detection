@@ -1,7 +1,9 @@
 import logging
 import os
+import sqlite3
 import time
 from collections import deque
+from contextlib import closing
 from typing import List, Optional
 
 import face_recognition
@@ -18,10 +20,13 @@ def person_name_from_filename(filename: str) -> str:
 
 
 class FaceRecognizer:
-    def __init__(self, known_faces_dir: str, tolerance: float = 0.5):
+    def __init__(self, known_faces_dir: str, tolerance: float = 0.5, cache_path: str | None = None):
         self._tolerance = tolerance
         self._known_encodings: List[np.ndarray] = []
         self._known_names: List[str] = []
+        self._cache = FaceEncodingCache(cache_path) if cache_path else None
+        cached_count = 0
+        calculated_count = 0
 
         if not os.path.isdir(known_faces_dir):
             logger.warning("熟人照片目录不存在: %s", known_faces_dir)
@@ -38,8 +43,14 @@ class FaceRecognizer:
                 continue
 
             try:
-                image = face_recognition.load_image_file(filepath)
-                encodings = face_recognition.face_encodings(image)
+                encoding = self._cache.get(filepath) if self._cache else None
+                if encoding is not None:
+                    cached_count += 1
+                    encodings = [encoding]
+                else:
+                    image = face_recognition.load_image_file(filepath)
+                    encodings = face_recognition.face_encodings(image)
+                    calculated_count += 1
             except (OSError, ValueError, TypeError) as exc:
                 logger.warning("无法读取熟人照片 %s，已跳过: %s", filename, exc)
                 continue
@@ -57,11 +68,13 @@ class FaceRecognizer:
 
             self._known_encodings.append(encodings[0])
             self._known_names.append(name)
+            if self._cache and encoding is None:
+                self._cache.put(filepath, encodings[0])
             logger.info("已注册熟人: %s", name)
 
         logger.info(
-            "熟人库加载完成: %d 人 (tolerance=%.2f)",
-            len(self._known_names), tolerance
+            "熟人库加载完成: %d 个样本（缓存 %d，重新计算 %d，tolerance=%.2f）",
+            len(self._known_names), cached_count, calculated_count, tolerance
         )
 
     def recognize(self, face_encoding: np.ndarray) -> Optional[str]:
@@ -90,6 +103,53 @@ class FaceRecognizer:
     @property
     def known_count(self) -> int:
         return len(self._known_names)
+
+
+class FaceEncodingCache:
+    """SQLite cache invalidated automatically by file size and modification time."""
+
+    def __init__(self, database_path: str):
+        self._database_path = os.path.abspath(database_path)
+        os.makedirs(os.path.dirname(self._database_path), exist_ok=True)
+        with closing(self._connect()) as connection, connection:
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS face_encodings (
+                    path TEXT PRIMARY KEY,
+                    mtime_ns INTEGER NOT NULL,
+                    file_size INTEGER NOT NULL,
+                    encoding BLOB NOT NULL
+                )
+            """)
+
+    def _connect(self):
+        return sqlite3.connect(self._database_path, timeout=5)
+
+    def get(self, path: str) -> np.ndarray | None:
+        absolute = os.path.abspath(path)
+        stat = os.stat(absolute)
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT mtime_ns, file_size, encoding FROM face_encodings WHERE path = ?",
+                (absolute,),
+            ).fetchone()
+        if not row or row[0] != stat.st_mtime_ns or row[1] != stat.st_size:
+            return None
+        encoding = np.frombuffer(row[2], dtype=np.float64).copy()
+        return encoding if encoding.shape == (128,) else None
+
+    def put(self, path: str, encoding: np.ndarray) -> None:
+        absolute = os.path.abspath(path)
+        stat = os.stat(absolute)
+        payload = np.asarray(encoding, dtype=np.float64).reshape(128).tobytes()
+        with closing(self._connect()) as connection, connection:
+            connection.execute("""
+                INSERT INTO face_encodings(path, mtime_ns, file_size, encoding)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(path) DO UPDATE SET
+                    mtime_ns = excluded.mtime_ns,
+                    file_size = excluded.file_size,
+                    encoding = excluded.encoding
+            """, (absolute, stat.st_mtime_ns, stat.st_size, payload))
 
 
 class StrangerTracker:

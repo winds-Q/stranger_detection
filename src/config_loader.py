@@ -52,6 +52,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     },
     "database": {
         "path": "./data/alerts.db",
+        "face_cache_path": "./data/face_encodings.db",
     },
     "retention": {
         "snapshots_days": 7,

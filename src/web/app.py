@@ -59,6 +59,7 @@ _active_recognizer = None
 _active_alerter = None
 _active_alert_dispatcher = None
 _event_repository = AlertEventRepository(os.path.join(PROJECT_ROOT, "data", "alerts.db"))
+_face_cache_path = os.path.join(PROJECT_ROOT, "data", "face_encodings.db")
 
 
 _handler = None
@@ -93,6 +94,7 @@ def _reload_recognizer(tolerance: float) -> FaceRecognizer:
     return FaceRecognizer(
         known_faces_dir=_known_faces_dir,
         tolerance=tolerance,
+        cache_path=_face_cache_path,
     )
 
 
@@ -126,6 +128,9 @@ def _detection_loop(config):
         recognizer = FaceRecognizer(
             known_faces_dir=_known_faces_dir,
             tolerance=config.recognition.get("tolerance", 0.5),
+            cache_path=config.resolve_path(
+                config.database.get("face_cache_path", "./data/face_encodings.db")
+            ),
         )
         stranger_tracker = StrangerTracker(
             tolerance=config.recognition.get("stranger_tolerance", 0.5),
@@ -454,9 +459,12 @@ def api_start():
     )
     _detection_thread.start()
 
-    startup_timeout = max(5, min(120, int(
-        config.web.get("startup_timeout_seconds", 30)
-    )))
+    sample_count = sum(
+        1 for name in os.listdir(_known_faces_dir)
+        if os.path.splitext(name)[1].lower() in _allowed_extensions
+    ) if os.path.isdir(_known_faces_dir) else 0
+    configured_timeout = int(config.web.get("startup_timeout_seconds", 30))
+    startup_timeout = max(5, min(600, max(configured_timeout, 10 + sample_count * 3)))
     if not _startup_event.wait(timeout=startup_timeout):
         _stop_event.set()
         return jsonify({

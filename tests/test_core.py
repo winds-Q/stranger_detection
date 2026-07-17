@@ -335,10 +335,12 @@ class WebAppTests(unittest.TestCase):
         config._data["web"]["startup_timeout_seconds"] = 5
         with patch("web.app.Config", return_value=config), patch(
             "web.app.threading.Thread"
-        ), patch.object(web_app._startup_event, "wait", return_value=False):
+        ), patch.object(web_app._startup_event, "wait", return_value=False), patch(
+            "web.app.os.listdir", return_value=[]
+        ):
             response = self.client.post("/api/detect/start")
         self.assertEqual(503, response.status_code)
-        self.assertIn("初始化超过 5 秒", response.get_json()["message"])
+        self.assertIn("初始化超过 10 秒", response.get_json()["message"])
 
     def test_config_validation(self):
         response = self.client.post(
@@ -527,6 +529,33 @@ class FaceRecognizerLoadingTests(unittest.TestCase):
                 recognizer = FaceRecognizer(TEST_TEMP_ROOT)
         loader.assert_not_called()
         self.assertEqual(0, recognizer.known_count)
+
+    def test_reuses_cached_encoding_for_unchanged_photo(self):
+        directory = os.path.join(TEST_TEMP_ROOT, "face-cache")
+        os.makedirs(directory, exist_ok=True)
+        photo_path = os.path.join(directory, "张三__sample.jpg")
+        cache_path = os.path.join(TEST_TEMP_ROOT, "face-cache.db")
+        with open(photo_path, "wb") as output:
+            output.write(b"image-data")
+        for suffix in ("", "-wal", "-shm"):
+            path = cache_path + suffix
+            if os.path.exists(path):
+                os.remove(path)
+
+        encoding = np.arange(128, dtype=np.float64)
+        with patch("recognizer.face_recognition.load_image_file", return_value=object()), patch(
+            "recognizer.face_recognition.face_encodings", return_value=[encoding]
+        ):
+            first = FaceRecognizer(directory, cache_path=cache_path)
+        with patch("recognizer.face_recognition.load_image_file") as loader:
+            second = FaceRecognizer(directory, cache_path=cache_path)
+
+        self.assertEqual(1, first.known_count)
+        self.assertEqual(1, second.known_count)
+        loader.assert_not_called()
+        os.remove(photo_path)
+        os.rmdir(directory)
+        os.remove(cache_path)
 
 
 class FrameProcessingControllerTests(unittest.TestCase):
