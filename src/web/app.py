@@ -518,6 +518,9 @@ def api_upload():
     filename = f"{person_name.replace(' ', '_')}__{uuid.uuid4().hex[:10]}{extension}"
     validation = FaceImageValidator(Config(_CONFIG_PATH), _known_faces_dir).validate(image)
     if not validation.ok:
+        logging.getLogger(__name__).warning(
+            "熟人照片上传被拒绝 (%s): %s", original_filename, validation.message
+        )
         return jsonify({"ok": False, "message": validation.message}), 400
 
     os.makedirs(_known_faces_dir, exist_ok=True)
@@ -550,6 +553,24 @@ def api_delete_face(filename):
     os.remove(path)
     _reload_event.set()  # 通知检测线程重新加载熟人库
     return jsonify({"ok": True, "message": f"{filename} 已删除"})
+
+
+@app.route("/api/faces/open-folder", methods=["POST"])
+def api_open_faces_folder():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"ok": False, "message": "仅允许在运行程序的本机打开目录"}), 403
+    os.makedirs(_known_faces_dir, exist_ok=True)
+    try:
+        if sys.platform == "win32":
+            os.startfile(_known_faces_dir)
+        else:
+            import subprocess
+            command = ["open", _known_faces_dir] if sys.platform == "darwin" else ["xdg-open", _known_faces_dir]
+            subprocess.Popen(command)
+    except OSError:
+        logging.getLogger(__name__).exception("打开熟人目录失败")
+        return jsonify({"ok": False, "message": "无法打开熟人目录"}), 500
+    return jsonify({"ok": True, "message": "已打开熟人目录"})
 
 
 @app.route("/api/logs/stream")

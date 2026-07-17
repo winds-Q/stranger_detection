@@ -234,6 +234,18 @@ class WebAppTests(unittest.TestCase):
                 response = self.client.get("/api/faces")
         self.assertEqual([], response.get_json())
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows folder opening test")
+    def test_open_faces_folder_is_limited_to_local_requests(self):
+        with patch.object(web_app.os, "startfile", create=True) as startfile:
+            response = self.client.post("/api/faces/open-folder")
+        self.assertEqual(200, response.status_code)
+        startfile.assert_called_once_with(web_app._known_faces_dir)
+
+        response = self.client.post(
+            "/api/faces/open-folder", environ_base={"REMOTE_ADDR": "192.168.1.2"}
+        )
+        self.assertEqual(403, response.status_code)
+
     def test_invalid_upload_is_rejected(self):
         with patch.object(web_app, "_known_faces_dir", TEST_TEMP_ROOT):
             response = self.client.post(

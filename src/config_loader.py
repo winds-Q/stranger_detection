@@ -64,7 +64,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "min_blur_score": 60,
         "min_brightness": 35,
         "max_brightness": 225,
-        "duplicate_tolerance": 0.42,
+        "duplicate_image_difference": 2.0,
     },
 }
 

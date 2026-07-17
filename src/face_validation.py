@@ -24,7 +24,9 @@ class FaceImageValidator:
         self._min_blur_score = float(rules.get("min_blur_score", 60))
         self._min_brightness = float(rules.get("min_brightness", 35))
         self._max_brightness = float(rules.get("max_brightness", 225))
-        self._duplicate_tolerance = float(rules.get("duplicate_tolerance", 0.42))
+        self._duplicate_image_difference = float(
+            rules.get("duplicate_image_difference", 2.0)
+        )
 
     def validate(self, image: np.ndarray, target_filename: str = "") -> FaceValidationResult:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -49,14 +51,17 @@ class FaceImageValidator:
         encodings = face_recognition.face_encodings(rgb, locations)
         if not encodings:
             return FaceValidationResult(False, "无法提取人脸特征，请更换正脸照片")
-        duplicate = self._find_duplicate(encodings[0], target_filename)
+        duplicate = self._find_duplicate(image, target_filename)
         if duplicate:
-            return FaceValidationResult(False, f"该人脸与已有照片 {duplicate} 重复")
+            return FaceValidationResult(False, f"该图片与已有样本 {duplicate} 重复")
         return FaceValidationResult(True, "照片质量检查通过")
 
-    def _find_duplicate(self, encoding: np.ndarray, target_filename: str) -> str | None:
+    def _find_duplicate(self, image: np.ndarray, target_filename: str) -> str | None:
+        """Detect the same image, not merely another photo of the same person."""
         if not os.path.isdir(self._known_faces_dir):
             return None
+        candidate = cv2.resize(image, (64, 64), interpolation=cv2.INTER_AREA)
+        candidate = cv2.cvtColor(candidate, cv2.COLOR_BGR2GRAY).astype(np.float32)
         for filename in os.listdir(self._known_faces_dir):
             if filename == target_filename:
                 continue
@@ -64,9 +69,14 @@ class FaceImageValidator:
             if not os.path.isfile(path) or os.path.splitext(filename)[1].lower() not in SUPPORTED_IMAGE_EXTENSIONS:
                 continue
             try:
-                known = face_recognition.face_encodings(face_recognition.load_image_file(path))
-            except (OSError, ValueError):
+                known_image = cv2.imread(path, cv2.IMREAD_COLOR)
+                if known_image is None:
+                    continue
+                known_image = cv2.resize(known_image, (64, 64), interpolation=cv2.INTER_AREA)
+                known_image = cv2.cvtColor(known_image, cv2.COLOR_BGR2GRAY).astype(np.float32)
+            except (OSError, ValueError, cv2.error):
                 continue
-            if known and float(face_recognition.face_distance([known[0]], encoding)[0]) <= self._duplicate_tolerance:
+            difference = float(np.mean(np.abs(candidate - known_image)))
+            if difference <= self._duplicate_image_difference:
                 return filename
         return None

@@ -229,10 +229,12 @@ function handleUpload(input) {
         input.value = "";
         return;
     }
+    statusEl.classList.remove("error");
     statusEl.textContent = "上传中...";
 
     let done = 0;
     let failed = 0;
+    const failureMessages = [];
     for (const file of files) {
         const form = new FormData();
         form.append("file", file);
@@ -244,13 +246,16 @@ function handleUpload(input) {
                 done++;
                 if (!ok || !data.ok) {
                     failed++;
+                    failureMessages.push(`${file.name}：${data.message || "上传失败"}`);
                 }
                 if (done === files.length && failed === 0) {
                     statusEl.textContent = `已上传 ${done} 个文件`;
+                    statusEl.classList.remove("error");
                     loadFaces();
                     input.value = "";
                 } else if (done === files.length) {
-                    statusEl.textContent = `${done - failed} 个成功，${failed} 个失败`;
+                    statusEl.textContent = `${done - failed} 个成功，${failed} 个失败\n${failureMessages.join("\n")}`;
+                    statusEl.classList.add("error");
                     loadFaces();
                     input.value = "";
                 }
@@ -258,12 +263,24 @@ function handleUpload(input) {
             .catch(() => {
                 done++;
                 failed++;
+                failureMessages.push(`${file.name}：网络请求失败`);
                 if (done === files.length) {
-                    statusEl.textContent = `${done - failed} 个成功，${failed} 个失败`;
+                    statusEl.textContent = `${done - failed} 个成功，${failed} 个失败\n${failureMessages.join("\n")}`;
+                    statusEl.classList.add("error");
                     loadFaces();
                     input.value = "";
                 }
             });
+    }
+}
+
+async function openFacesFolder() {
+    try {
+        const res = await fetch("/api/faces/open-folder", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok || !data.ok) alert(data.message || "无法打开熟人目录");
+    } catch (_) {
+        alert("无法连接 Web 服务");
     }
 }
 
