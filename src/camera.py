@@ -96,6 +96,14 @@ class Camera:
     def is_opened(self) -> bool:
         return self._cap is not None and self._cap.isOpened()
 
+    @property
+    def state(self) -> str:
+        if self._closed:
+            return "disconnected"
+        if self.is_opened():
+            return "connected"
+        return "reconnecting"
+
     def _release_capture(self) -> None:
         if self._cap is not None:
             self._cap.release()

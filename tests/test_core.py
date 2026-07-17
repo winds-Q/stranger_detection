@@ -21,6 +21,7 @@ from recognizer import FaceRecognizer, StrangerTracker
 from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
 from visual import annotate_frame
+from health import RuntimeHealth
 from web import app as web_app
 
 
@@ -203,6 +204,16 @@ class WebAppTests(unittest.TestCase):
             os.path.join(PROJECT_ROOT, "known_faces"),
             web_app._known_faces_dir,
         )
+
+    def test_status_contains_health_fields_without_secrets(self):
+        response = self.client.get("/api/status")
+        data = response.get_json()
+        for field in (
+            "camera_state", "detection_fps", "known_faces", "alerts_today",
+            "smtp_configured", "alert_queue_pending", "last_frame_time",
+        ):
+            self.assertIn(field, data)
+        self.assertNotIn("sender_password", data)
 
     def test_faces_api_hides_gitkeep_and_non_image_files(self):
         with (
@@ -493,6 +504,25 @@ class VisualAnnotationTests(unittest.TestCase):
         self.assertFalse(np.any(frame))
         self.assertGreater(int(annotated[:, :, 2].max()), 0)
         self.assertGreater(int(annotated[:, :, 1].max()), 0)
+
+
+class RuntimeHealthTests(unittest.TestCase):
+    def test_records_activity_fps_and_daily_alerts(self):
+        now = [1000.0]
+        health = RuntimeHealth(clock=lambda: now[0])
+        health.set_camera_state("connected")
+        health.record_frame()
+        health.record_detection()
+        now[0] = 1000.5
+        health.record_detection()
+        health.record_alert()
+        snapshot = health.snapshot(known_faces=3, smtp_configured=True, alert_queue_pending=2)
+
+        self.assertEqual("connected", snapshot["camera_state"])
+        self.assertEqual(2.0, snapshot["detection_fps"])
+        self.assertEqual(3, snapshot["known_faces"])
+        self.assertEqual(1, snapshot["alerts_today"])
+        self.assertEqual(2, snapshot["alert_queue_pending"])
 
 
 if __name__ == "__main__":

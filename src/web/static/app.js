@@ -19,6 +19,20 @@ function updateButtons(running) {
     btnSaveCamera.disabled = running || !cameraSelect.value;
 }
 
+function updateHealth(data) {
+    const cameraLabels = {
+        connected: "已连接",
+        reconnecting: "重连中",
+        disconnected: "未连接",
+    };
+    document.getElementById("healthCamera").textContent = cameraLabels[data.camera_state] || data.camera_state;
+    document.getElementById("healthFps").textContent = Number(data.detection_fps || 0).toFixed(1);
+    document.getElementById("healthFaces").textContent = data.known_faces ?? 0;
+    document.getElementById("healthAlerts").textContent = data.alerts_today ?? 0;
+    document.getElementById("healthSmtp").textContent = data.smtp_configured ? "已配置" : "未配置";
+    document.getElementById("healthQueue").textContent = data.alert_queue_pending ?? 0;
+}
+
 async function loadCameraSelection() {
     try {
         const res = await fetch("/api/cameras");
@@ -114,6 +128,7 @@ async function fetchStatus() {
         const res = await fetch("/api/status");
         const data = await res.json();
         updateButtons(data.running);
+        updateHealth(data);
         if (data.error && !data.running) {
             statusTxt.textContent = "启动失败";
             statusTxt.title = data.error;
@@ -321,6 +336,7 @@ async function saveConfig() {
 }
 
 fetchStatus();
+setInterval(fetchStatus, 3000);
 loadFaces();
 loadConfig();
 loadCameraSelection();

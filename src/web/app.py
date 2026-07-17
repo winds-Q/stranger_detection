@@ -28,6 +28,7 @@ from logger import setup_logger
 from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
 from visual import annotate_frame
+from health import RuntimeHealth
 
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -46,6 +47,10 @@ _detection_error: str | None = None
 _allowed_extensions = {".jpg", ".jpeg", ".png", ".bmp"}
 _camera_operation_lock = threading.Lock()
 _camera_scan_max_devices = 6
+_health = RuntimeHealth()
+_active_recognizer = None
+_active_alerter = None
+_active_alert_dispatcher = None
 
 
 _handler = None
@@ -81,7 +86,8 @@ def _reload_recognizer(tolerance: float) -> FaceRecognizer:
 
 
 def _detection_loop(config):
-    global _detection_error
+    global _detection_error, _active_recognizer, _active_alerter
+    global _active_alert_dispatcher
     _log = logging.getLogger(__name__)
     camera = None
     alert_dispatcher = None
@@ -127,6 +133,11 @@ def _detection_loop(config):
         confirmation = StrangerConfirmation(**config.detection_confirmation)
         event_manager = StrangerEventManager(**config.stranger_tracking)
         _detection_error = None
+        _active_recognizer = recognizer
+        _active_alerter = alerter
+        _active_alert_dispatcher = alert_dispatcher
+        _health.reset()
+        _health.set_camera_state(camera.state)
         _startup_event.set()
         _log.info("检测已启动")
 
@@ -140,15 +151,18 @@ def _detection_loop(config):
                 _log.info("熟人库已重新加载 (%d 人)", recognizer.known_count)
 
             frame = camera.get_frame()
+            _health.set_camera_state(camera.state)
             if frame is None:
                 time.sleep(0.1)
                 continue
+            _health.record_frame()
 
             if not processor.should_process():
                 time.sleep(0.01)
                 continue
 
             detection_frame = processor.prepare_frame(frame)
+            _health.record_detection()
             face_locations = detector.detect(detection_frame)
             if not face_locations:
                 for departed_id in event_manager.mark_departures():
@@ -175,7 +189,8 @@ def _detection_loop(config):
             if alert_event_ids:
                 alert_frame = annotate_frame(frame, annotations)
                 for event_id in alert_event_ids:
-                    alert_dispatcher.submit(alert_frame, event_id)
+                    if alert_dispatcher.submit(alert_frame, event_id):
+                        _health.record_alert()
 
             confirmation.cleanup()
             for departed_id in event_manager.mark_departures():
@@ -189,8 +204,12 @@ def _detection_loop(config):
         _startup_event.set()
         if camera is not None:
             camera.release()
+        _health.set_camera_state("disconnected")
         if alert_dispatcher is not None:
             alert_dispatcher.close()
+        _active_recognizer = None
+        _active_alerter = None
+        _active_alert_dispatcher = None
         _log.info("检测已停止")
 
 
@@ -204,7 +223,15 @@ def index():
 @app.route("/api/status")
 def api_status():
     running = _detection_thread is not None and _detection_thread.is_alive()
-    return jsonify({"running": running, "error": _detection_error})
+    health = _health.snapshot(
+        known_faces=_active_recognizer.known_count if _active_recognizer else 0,
+        smtp_configured=_active_alerter.is_configured if _active_alerter else False,
+        alert_queue_pending=(
+            _active_alert_dispatcher.pending_count
+            if _active_alert_dispatcher else 0
+        ),
+    )
+    return jsonify({"running": running, "error": _detection_error, **health})
 
 
 @app.route("/api/cameras")
