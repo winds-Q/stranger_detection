@@ -5,6 +5,7 @@ const statusDot = document.getElementById("statusDot");
 const statusTxt = document.getElementById("statusText");
 
 let logLines = [];
+let logEventSource = null;
 
 function updateButtons(running) {
     btnStart.disabled = running;
@@ -164,16 +165,28 @@ async function loadFaces() {
 }
 
 function startLogStream() {
-    const es = new EventSource("/api/logs/stream");
-    es.onmessage = function (e) {
+    if (logEventSource && logEventSource.readyState !== EventSource.CLOSED) {
+        return;
+    }
+
+    logEventSource = new EventSource("/api/logs/stream");
+    logEventSource.onmessage = function (e) {
         try {
             const data = JSON.parse(e.data);
             if (data.msg) appendLog(data.msg);
         } catch (_) {}
     };
-    es.onerror = function () {
-        setTimeout(startLogStream, 3000);
+    logEventSource.onerror = function () {
+        // EventSource 会根据服务端 retry 指令自动重连，无需创建重复连接。
+        console.warn("实时日志连接暂时中断，等待自动重连");
     };
+}
+
+function stopLogStream() {
+    if (logEventSource) {
+        logEventSource.close();
+        logEventSource = null;
+    }
 }
 
 async function loadConfig() {
@@ -237,4 +250,11 @@ async function saveConfig() {
 fetchStatus();
 loadFaces();
 loadConfig();
-startLogStream();
+
+// 页面完成加载后再建立永久 SSE 连接，避免浏览器一直显示加载状态。
+if (document.readyState === "complete") {
+    startLogStream();
+} else {
+    window.addEventListener("load", startLogStream, { once: true });
+}
+window.addEventListener("beforeunload", stopLogStream);

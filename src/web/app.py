@@ -312,6 +312,7 @@ def api_delete_face(filename):
 @app.route("/api/logs/stream")
 def api_log_stream():
     def generate():
+        yield "retry: 3000\n\n"
         while True:
             try:
                 msg = _log_queue.get(timeout=1)

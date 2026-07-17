@@ -233,6 +233,13 @@ class WebAppTests(unittest.TestCase):
         )
         self.assertEqual(400, response.status_code)
 
+    def test_log_stream_declares_reconnect_delay(self):
+        response = self.client.get("/api/logs/stream", buffered=False)
+        try:
+            self.assertEqual(b"retry: 3000\n\n", next(response.response))
+        finally:
+            response.close()
+
 
 class StrangerTrackerTests(unittest.TestCase):
     def test_same_face_gets_same_id_and_different_face_gets_new_id(self):
