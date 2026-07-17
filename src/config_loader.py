@@ -134,3 +134,10 @@ class Config:
 
     def get(self, key: str, default: Any = None) -> Any:
         return self._data.get(key, default)
+
+    def resolve_path(self, path: str) -> str:
+        """Resolve relative runtime paths from the configuration file directory."""
+        if os.path.isabs(path):
+            return os.path.abspath(path)
+        config_dir = os.path.dirname(os.path.abspath(self._config_path))
+        return os.path.abspath(os.path.join(config_dir, path))

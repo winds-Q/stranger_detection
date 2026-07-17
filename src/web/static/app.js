@@ -113,7 +113,7 @@ async function loadEvents() {
           const snapshotUrl = `/api/events/${event.id}/snapshot`;
           return `
           <div class="event-item ${statusClass}">
-            ${event.has_snapshot ? `<a class="event-snapshot" href="${snapshotUrl}" target="_blank" rel="noopener" title="点击查看陌生人照片"><img src="${snapshotUrl}" alt="陌生人告警截图" loading="lazy"></a>` : `<div class="event-snapshot event-snapshot-empty">暂无照片</div>`}
+            ${event.has_snapshot ? `<a class="event-snapshot" href="${snapshotUrl}" target="_blank" rel="noopener" title="点击查看陌生人照片"><img src="${snapshotUrl}" alt="陌生人告警截图" loading="lazy" onerror="handleSnapshotError(this)"><span class="snapshot-zoom">查看原图</span></a>` : `<div class="event-snapshot event-snapshot-empty">暂无照片</div>`}
             <div class="event-top"><span class="event-id" title="${escapeHtml(event.event_key)}">${escapeHtml(event.stranger_id)}</span><span class="event-status ${statusClass}">${statusLabels[event.notification_status] || escapeHtml(event.notification_status)}</span></div>
             <div class="event-meta">出现：${escapeHtml(event.first_seen_at)}<br>离开：${escapeHtml(event.left_at || "仍在画面或未确认")}</div>
             <div class="event-actions">
@@ -126,6 +126,15 @@ async function loadEvents() {
     } catch (e) {
         list.innerHTML = '<div class="empty-state">告警历史加载失败</div>';
     }
+}
+
+function handleSnapshotError(image) {
+    const container = image.closest(".event-snapshot");
+    if (container) {
+        container.classList.add("event-snapshot-error");
+        container.removeAttribute("href");
+    }
+    image.remove();
 }
 
 async function markEventHandled(eventId, handled) {

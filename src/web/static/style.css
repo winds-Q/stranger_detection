@@ -277,7 +277,13 @@ button, input { font: inherit; }
 .event-snapshot { display: block; height: 112px; margin: -12px -12px 11px; overflow: hidden; color: var(--muted); background: rgba(5,9,20,.7); text-decoration: none; }
 .event-snapshot img { width: 100%; height: 100%; display: block; object-fit: cover; transition: transform .2s, filter .2s; }
 .event-snapshot:hover img { transform: scale(1.035); filter: brightness(1.08); }
+.snapshot-zoom { position: absolute; right: 9px; bottom: 9px; padding: 4px 8px; border-radius: 8px; color: #fff; background: rgba(5,9,20,.72); font-size: 9px; opacity: 0; transition: opacity .18s; }
+.event-snapshot { position: relative; }
+.event-snapshot:hover .snapshot-zoom { opacity: 1; }
 .event-snapshot-empty { display: grid; place-items: center; font-size: 10px; }
+.event-snapshot-error { display: grid; place-items: center; cursor: default; }
+.event-snapshot-error::before { content: "图片暂不可用"; color: var(--muted); font-size: 11px; }
+.event-snapshot-error .snapshot-zoom { display: none; }
 .event-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .event-id { overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .event-status { padding: 2px 7px; border-radius: 99px; color: var(--muted); background: var(--surface-soft); font-size: 9px; font-weight: 700; }

@@ -359,6 +359,20 @@ class WebAppTests(unittest.TestCase):
         response.close()
         os.remove(safe_path)
 
+    def test_legacy_web_snapshot_can_still_be_opened(self):
+        legacy_root = os.path.join(PROJECT_ROOT, "src", "web", "snapshots")
+        os.makedirs(legacy_root, exist_ok=True)
+        safe_path = os.path.join(legacy_root, "legacy-test-event.jpg")
+        with open(safe_path, "wb") as output:
+            output.write(b"jpeg-data")
+        with patch.object(web_app._event_repository, "get_event", return_value={
+            "id": 2, "snapshot_path": safe_path
+        }):
+            response = self.client.get("/api/events/2/snapshot")
+        self.assertEqual(200, response.status_code)
+        response.close()
+        os.remove(safe_path)
+
     def test_log_stream_declares_reconnect_delay(self):
         response = self.client.get("/api/logs/stream", buffered=False)
         try:

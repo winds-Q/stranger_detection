@@ -36,7 +36,8 @@ class Alerter:
             )
 
         snapshot_cfg = config.snapshot
-        self._snapshot_dir = os.path.abspath(snapshot_cfg.get("save_to", "./snapshots/"))
+        snapshot_path = snapshot_cfg.get("save_to", "./snapshots/")
+        self._snapshot_dir = config.resolve_path(snapshot_path)
         self._max_snapshots = snapshot_cfg.get("max_snapshots", 100)
 
         self._last_alert_times = {}

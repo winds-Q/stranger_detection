@@ -306,11 +306,7 @@ def api_event_snapshot(event_id):
     if not event or not event.get("snapshot_path"):
         return jsonify({"ok": False, "message": "截图不存在"}), 404
     path = os.path.abspath(event["snapshot_path"])
-    snapshot_root = os.path.abspath(os.path.join(PROJECT_ROOT, "snapshots"))
-    try:
-        if os.path.commonpath([path, snapshot_root]) != snapshot_root:
-            raise ValueError
-    except ValueError:
+    if not _is_allowed_snapshot_path(path):
         return jsonify({"ok": False, "message": "截图路径不合法"}), 400
     if not os.path.isfile(path):
         return jsonify({"ok": False, "message": "截图文件不存在"}), 404
@@ -319,12 +315,26 @@ def api_event_snapshot(event_id):
 
 def _safe_delete_snapshot(snapshot_path):
     path = os.path.abspath(snapshot_path)
-    snapshot_root = os.path.abspath(os.path.join(PROJECT_ROOT, "snapshots"))
     try:
-        if os.path.commonpath([path, snapshot_root]) == snapshot_root and os.path.isfile(path):
+        if _is_allowed_snapshot_path(path) and os.path.isfile(path):
             os.remove(path)
     except (ValueError, OSError):
         logging.getLogger(__name__).warning("删除告警截图失败")
+
+
+def _is_allowed_snapshot_path(path):
+    """Accept the canonical directory and the legacy Web working directory."""
+    roots = (
+        os.path.abspath(os.path.join(PROJECT_ROOT, "snapshots")),
+        os.path.abspath(os.path.join(PROJECT_ROOT, "src", "web", "snapshots")),
+    )
+    for root in roots:
+        try:
+            if os.path.commonpath([os.path.abspath(path), root]) == root:
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 @app.route("/api/cameras/scan", methods=["POST"])
