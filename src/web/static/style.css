@@ -24,9 +24,13 @@
     padding: 0;
 }
 
-html { min-width: 320px; }
+html {
+    min-width: 320px;
+    height: 100%;
+}
 
 body {
+    height: 100%;
     min-height: 100vh;
     font-family: Inter, "Segoe UI Variable", "Segoe UI", "Microsoft YaHei", sans-serif;
     color: var(--text);
@@ -56,10 +60,12 @@ button, input { font: inherit; }
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
     isolation: isolate;
 }
 
 .header {
+    flex: 0 0 auto;
     height: 82px;
     padding: 0 30px;
     display: flex;
@@ -109,7 +115,13 @@ button, input { font: inherit; }
     50% { box-shadow: 0 0 0 8px rgba(53, 212, 154, 0); }
 }
 
-.main { display: grid; grid-template-columns: 350px minmax(0, 1fr); flex: 1; min-height: 0; }
+.main {
+    display: grid;
+    grid-template-columns: 350px minmax(0, 1fr);
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
 
 .sidebar {
     padding: 22px 16px 28px 24px;
@@ -241,7 +253,16 @@ button, input { font: inherit; }
 .face-item .delete-btn:hover { background: rgba(255,100,124,.12); }
 .badge { margin-left: 5px; padding: 2px 7px; border-radius: 999px; color: #c8c7ff; background: rgba(109,106,252,.14); font-size: 10px; font-weight: 700; }
 
-.workspace { min-width: 0; padding: 22px 24px 26px 20px; }
+.workspace {
+    min-width: 0;
+    min-height: 0;
+    padding: 22px 24px 26px 20px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #465574 rgba(5, 9, 20, .35);
+}
 .workspace { display: flex; flex-direction: column; gap: 14px; }
 .health-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
 .health-card { min-width: 0; padding: 13px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 10px 26px rgba(0,0,0,.13); }
@@ -265,7 +286,8 @@ button, input { font: inherit; }
 
 .log-viewer {
     flex: 1;
-    min-height: 0;
+    min-height: 280px;
+    max-height: 55vh;
     padding: 16px 18px;
     overflow-y: auto;
     border: 1px solid rgba(148,163,184,.1);
@@ -280,6 +302,33 @@ button, input { font: inherit; }
     scrollbar-color: #33405d transparent;
 }
 
+.sidebar::-webkit-scrollbar,
+.workspace::-webkit-scrollbar,
+.log-viewer::-webkit-scrollbar,
+.event-list::-webkit-scrollbar,
+.face-list::-webkit-scrollbar {
+    width: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb,
+.workspace::-webkit-scrollbar-thumb,
+.log-viewer::-webkit-scrollbar-thumb,
+.event-list::-webkit-scrollbar-thumb,
+.face-list::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: #465574;
+    background-clip: padding-box;
+}
+
+.sidebar::-webkit-scrollbar-track,
+.workspace::-webkit-scrollbar-track,
+.log-viewer::-webkit-scrollbar-track,
+.event-list::-webkit-scrollbar-track,
+.face-list::-webkit-scrollbar-track {
+    background: rgba(5, 9, 20, .25);
+}
+
 .log-viewer:empty::before { content: "等待系统日志…"; color: #4f5d79; }
 .log-line { padding: 2px 0; border-bottom: 1px solid rgba(148,163,184,.035); }
 .log-line .warn { color: var(--warning); }
@@ -290,13 +339,14 @@ button, input { font: inherit; }
 @media (max-width: 900px) {
     body { overflow: auto; }
     .app { height: auto; min-height: 100vh; }
-    .main { display: flex; flex-direction: column; }
+    .main { display: flex; flex-direction: column; overflow: visible; }
     .sidebar { width: 100%; padding: 18px; overflow: visible; border-right: 0; }
     .sidebar-inner { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-    .workspace { padding: 0 18px 22px; }
+    .workspace { padding: 0 18px 22px; overflow: visible; }
     .health-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .event-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .log-panel { min-height: 480px; }
+    .log-viewer { max-height: 520px; }
 }
 
 @media (max-width: 600px) {
