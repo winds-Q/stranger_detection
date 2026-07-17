@@ -107,16 +107,22 @@ async function loadEvents() {
             return;
         }
         const statusLabels = { pending: "待发送", sent: "已发送", failed: "发送失败" };
-        list.innerHTML = events.map(event => `
-          <div class="event-item">
-            <div class="event-top"><span class="event-id" title="${escapeHtml(event.event_key)}">${escapeHtml(event.stranger_id)}</span><span class="event-status">${statusLabels[event.notification_status] || event.notification_status}</span></div>
+        const statusClasses = { pending: "status-pending", sent: "status-sent", failed: "status-failed" };
+        list.innerHTML = events.map(event => {
+          const statusClass = statusClasses[event.notification_status] || "status-pending";
+          const snapshotUrl = `/api/events/${event.id}/snapshot`;
+          return `
+          <div class="event-item ${statusClass}">
+            ${event.has_snapshot ? `<a class="event-snapshot" href="${snapshotUrl}" target="_blank" rel="noopener" title="点击查看陌生人照片"><img src="${snapshotUrl}" alt="陌生人告警截图" loading="lazy"></a>` : `<div class="event-snapshot event-snapshot-empty">暂无照片</div>`}
+            <div class="event-top"><span class="event-id" title="${escapeHtml(event.event_key)}">${escapeHtml(event.stranger_id)}</span><span class="event-status ${statusClass}">${statusLabels[event.notification_status] || escapeHtml(event.notification_status)}</span></div>
             <div class="event-meta">出现：${escapeHtml(event.first_seen_at)}<br>离开：${escapeHtml(event.left_at || "仍在画面或未确认")}</div>
             <div class="event-actions">
-              ${event.has_snapshot ? `<button class="btn btn-small" onclick="window.open('/api/events/${event.id}/snapshot','_blank')">截图</button>` : ""}
+              ${event.has_snapshot ? `<a class="btn btn-small event-photo-link" href="${snapshotUrl}" target="_blank" rel="noopener">查看照片</a>` : ""}
               <button class="btn btn-small" onclick="markEventHandled(${event.id}, ${!event.handled})">${event.handled ? "取消处理" : "标记处理"}</button>
               <button class="btn btn-red" onclick="deleteEvent(${event.id})">删除</button>
             </div>
-          </div>`).join("");
+          </div>`;
+        }).join("");
     } catch (e) {
         list.innerHTML = '<div class="empty-state">告警历史加载失败</div>';
     }

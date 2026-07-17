@@ -344,6 +344,21 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertTrue(response.get_json()["ok"])
 
+    def test_event_snapshot_can_be_opened_inline(self):
+        snapshot_root = os.path.join(PROJECT_ROOT, "snapshots")
+        safe_path = os.path.join(snapshot_root, "test-event.jpg")
+        os.makedirs(snapshot_root, exist_ok=True)
+        with open(safe_path, "wb") as output:
+            output.write(b"jpeg-data")
+        event = {"id": 1, "snapshot_path": safe_path}
+        with patch.object(web_app._event_repository, "get_event", return_value=event):
+            response = self.client.get("/api/events/1/snapshot")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("image/jpeg", response.mimetype)
+        self.assertIn("inline", response.headers.get("Content-Disposition", "inline"))
+        response.close()
+        os.remove(safe_path)
+
     def test_log_stream_declares_reconnect_delay(self):
         response = self.client.get("/api/logs/stream", buffered=False)
         try:

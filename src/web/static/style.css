@@ -270,13 +270,24 @@ button, input { font: inherit; }
 .health-card strong { display: block; overflow: hidden; color: #edf2ff; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .history-panel { padding: 17px 20px; }
 .event-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-height: 210px; overflow-y: auto; }
-.event-item { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(3,7,16,.45); }
+.event-item { overflow: hidden; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(3,7,16,.45); transition: border-color .18s, box-shadow .18s; }
+.event-item.status-sent { border-color: rgba(53, 212, 154, .42); box-shadow: inset 0 0 0 1px rgba(53, 212, 154, .06); }
+.event-item.status-failed { border-color: rgba(255, 100, 124, .62); background: linear-gradient(145deg, rgba(255,100,124,.1), rgba(3,7,16,.48)); box-shadow: 0 0 22px rgba(255,100,124,.08); }
+.event-item.status-pending { border-color: rgba(248, 187, 84, .32); }
+.event-snapshot { display: block; height: 112px; margin: -12px -12px 11px; overflow: hidden; color: var(--muted); background: rgba(5,9,20,.7); text-decoration: none; }
+.event-snapshot img { width: 100%; height: 100%; display: block; object-fit: cover; transition: transform .2s, filter .2s; }
+.event-snapshot:hover img { transform: scale(1.035); filter: brightness(1.08); }
+.event-snapshot-empty { display: grid; place-items: center; font-size: 10px; }
 .event-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .event-id { overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.event-status { padding: 2px 6px; border-radius: 99px; color: var(--muted); background: var(--surface-soft); font-size: 9px; }
+.event-status { padding: 2px 7px; border-radius: 99px; color: var(--muted); background: var(--surface-soft); font-size: 9px; font-weight: 700; }
+.event-status.status-sent { color: #83efc7; background: rgba(53,212,154,.14); }
+.event-status.status-failed { color: #ff9aaa; background: rgba(255,100,124,.16); }
+.event-status.status-pending { color: #ffd88d; background: rgba(248,187,84,.13); }
 .event-meta { color: var(--muted); font-size: 10px; line-height: 1.6; }
 .event-actions { display: flex; gap: 6px; margin-top: 9px; }
 .event-actions .btn { min-height: 27px; padding: 3px 8px; font-size: 10px; }
+.event-photo-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .empty-state { grid-column: 1 / -1; padding: 18px; color: var(--muted); text-align: center; font-size: 12px; }
 .log-panel { min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 20px; }
 .log-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
