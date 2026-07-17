@@ -44,6 +44,8 @@ _known_faces_dir = os.path.join(PROJECT_ROOT, "known_faces")
 _reload_event = threading.Event()  # 通知检测线程重新加载熟人库
 _detection_error: str | None = None
 _allowed_extensions = {".jpg", ".jpeg", ".png", ".bmp"}
+_camera_operation_lock = threading.Lock()
+_camera_scan_max_devices = 6
 
 
 _handler = None
@@ -205,12 +207,98 @@ def api_status():
     return jsonify({"running": running, "error": _detection_error})
 
 
+@app.route("/api/cameras")
+def api_cameras():
+    cfg = _load_yaml_config()
+    camera_cfg = cfg.get("camera", {})
+    return jsonify({
+        "selected_device_id": camera_cfg.get("device_id", 0),
+        "scan_max_devices": _camera_scan_max_devices,
+    })
+
+
+@app.route("/api/cameras/scan", methods=["POST"])
+def api_scan_cameras():
+    if _detection_thread and _detection_thread.is_alive():
+        return jsonify({
+            "ok": False,
+            "message": "请先停止检测，再扫描摄像头",
+        }), 409
+
+    data = request.get_json(silent=True) or {}
+    try:
+        max_devices = int(data.get("max_devices", _camera_scan_max_devices))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "message": "扫描数量必须是整数"}), 400
+    if not 1 <= max_devices <= 10:
+        return jsonify({"ok": False, "message": "扫描数量必须在 1-10 之间"}), 400
+
+    if not _camera_operation_lock.acquire(blocking=False):
+        return jsonify({"ok": False, "message": "摄像头操作正在进行中"}), 409
+
+    devices = []
+    try:
+        for device_id in range(max_devices):
+            cap = cv2.VideoCapture(device_id)
+            try:
+                if not cap.isOpened():
+                    continue
+                ok, frame = cap.read()
+                if not ok or frame is None:
+                    continue
+                height, width = frame.shape[:2]
+                devices.append({
+                    "device_id": device_id,
+                    "width": int(width),
+                    "height": int(height),
+                    "label": f"摄像头 {device_id} ({width}×{height})",
+                })
+            finally:
+                cap.release()
+    finally:
+        _camera_operation_lock.release()
+
+    return jsonify({"ok": True, "devices": devices})
+
+
+@app.route("/api/cameras/select", methods=["POST"])
+def api_select_camera():
+    if _detection_thread and _detection_thread.is_alive():
+        return jsonify({
+            "ok": False,
+            "message": "请先停止检测，再切换摄像头",
+        }), 409
+
+    data = request.get_json(silent=True) or {}
+    try:
+        device_id = int(data.get("device_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "message": "摄像头编号必须是整数"}), 400
+    if not 0 <= device_id <= 9:
+        return jsonify({"ok": False, "message": "摄像头编号必须在 0-9 之间"}), 400
+
+    cfg = _load_yaml_config()
+    camera_cfg = cfg.setdefault("camera", {})
+    camera_cfg["device_id"] = device_id
+    _save_yaml_config(cfg)
+    return jsonify({
+        "ok": True,
+        "message": f"已选择摄像头 {device_id}，下次启动检测时生效",
+        "device_id": device_id,
+    })
+
+
 @app.route("/api/detect/start", methods=["POST"])
 def api_start():
     global _detection_thread, _detection_error
 
     if _detection_thread and _detection_thread.is_alive():
         return jsonify({"ok": False, "message": "检测已在运行中"}), 409
+    if _camera_operation_lock.locked():
+        return jsonify({
+            "ok": False,
+            "message": "摄像头扫描正在进行，请稍后再启动检测",
+        }), 409
 
     _stop_event.clear()
     _startup_event.clear()

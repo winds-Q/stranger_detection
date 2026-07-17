@@ -192,6 +192,10 @@ button, input { font: inherit; }
 .upload-btn:hover { transform: translateY(-1px); border-color: var(--primary-bright); background: rgba(109,106,252,.13); }
 .upload-status { min-height: 16px; margin-top: 8px; color: var(--muted); font-size: 11px; }
 
+.camera-picker { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; margin-bottom: 10px; }
+.camera-select { appearance: none; padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, #8e9bb7 50%), linear-gradient(135deg, #8e9bb7 50%, transparent 50%); background-position: calc(100% - 15px) 16px, calc(100% - 10px) 16px; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+.camera-picker .btn { white-space: nowrap; }
+
 .form-grid { display: grid; grid-template-columns: 1fr 92px; gap: 10px; }
 .form-row { margin-bottom: 11px; }
 .form-row.compact { margin-bottom: 0; }

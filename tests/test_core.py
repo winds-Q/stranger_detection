@@ -292,6 +292,57 @@ class WebAppTests(unittest.TestCase):
         finally:
             response.close()
 
+    def test_camera_scan_returns_available_devices_and_releases_all(self):
+        unavailable = MagicMock()
+        unavailable.isOpened.return_value = False
+        available = MagicMock()
+        available.isOpened.return_value = True
+        available.read.return_value = (
+            True,
+            np.zeros((480, 640, 3), dtype=np.uint8),
+        )
+        captures = [available, unavailable]
+        with patch("web.app.cv2.VideoCapture", side_effect=captures):
+            response = self.client.post(
+                "/api/cameras/scan",
+                json={"max_devices": 2},
+            )
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(0, response.get_json()["devices"][0]["device_id"])
+        self.assertEqual(640, response.get_json()["devices"][0]["width"])
+        available.release.assert_called_once()
+        unavailable.release.assert_called_once()
+
+    def test_camera_selection_updates_config(self):
+        with patch.object(
+            web_app,
+            "_load_yaml_config",
+            return_value={"camera": {"device_id": 0}},
+        ), patch.object(web_app, "_save_yaml_config") as save_config:
+            response = self.client.post(
+                "/api/cameras/select",
+                json={"device_id": 2},
+            )
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(2, save_config.call_args.args[0]["camera"]["device_id"])
+
+    def test_camera_selection_rejects_invalid_device_id(self):
+        response = self.client.post(
+            "/api/cameras/select",
+            json={"device_id": 20},
+        )
+        self.assertEqual(400, response.status_code)
+
+    def test_detection_start_is_blocked_during_camera_scan(self):
+        web_app._camera_operation_lock.acquire()
+        try:
+            response = self.client.post("/api/detect/start")
+        finally:
+            web_app._camera_operation_lock.release()
+        self.assertEqual(409, response.status_code)
+
 
 class StrangerTrackerTests(unittest.TestCase):
     def test_same_face_gets_same_id_and_different_face_gets_new_id(self):

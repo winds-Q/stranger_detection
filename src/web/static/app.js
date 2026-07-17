@@ -3,6 +3,9 @@ const btnStart  = document.getElementById("btnStart");
 const btnStop   = document.getElementById("btnStop");
 const statusDot = document.getElementById("statusDot");
 const statusTxt = document.getElementById("statusText");
+const cameraSelect = document.getElementById("cameraSelect");
+const btnScanCamera = document.getElementById("btnScanCamera");
+const btnSaveCamera = document.getElementById("btnSaveCamera");
 
 let logLines = [];
 let logEventSource = null;
@@ -12,7 +15,77 @@ function updateButtons(running) {
     btnStop.disabled  = !running;
     statusDot.className = running ? "dot on" : "dot off";
     statusTxt.textContent = running ? "运行中" : "未运行";
+    btnScanCamera.disabled = running;
+    btnSaveCamera.disabled = running || !cameraSelect.value;
 }
+
+async function loadCameraSelection() {
+    try {
+        const res = await fetch("/api/cameras");
+        const data = await res.json();
+        cameraSelect.innerHTML = `<option value="${data.selected_device_id}">摄像头 ${data.selected_device_id}（当前配置）</option>`;
+        cameraSelect.value = String(data.selected_device_id);
+        btnSaveCamera.disabled = true;
+    } catch (e) {
+        document.getElementById("cameraStatus").textContent = "无法读取摄像头配置";
+    }
+}
+
+async function scanCameras() {
+    const statusEl = document.getElementById("cameraStatus");
+    btnScanCamera.disabled = true;
+    btnSaveCamera.disabled = true;
+    statusEl.textContent = "正在扫描摄像头，请稍候...";
+    try {
+        const res = await fetch("/api/cameras/scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ max_devices: 6 }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+            statusEl.textContent = data.message || "扫描失败";
+            return;
+        }
+        if (!data.devices.length) {
+            cameraSelect.innerHTML = '<option value="">未发现可用摄像头</option>';
+            statusEl.textContent = "未发现可用摄像头，请检查权限或设备连接";
+            return;
+        }
+        cameraSelect.innerHTML = data.devices.map(device =>
+            `<option value="${device.device_id}">${escapeHtml(device.label)}</option>`
+        ).join("");
+        btnSaveCamera.disabled = false;
+        statusEl.textContent = `发现 ${data.devices.length} 个可用设备`;
+    } catch (e) {
+        statusEl.textContent = "扫描请求失败，请检查 Web 服务";
+    } finally {
+        btnScanCamera.disabled = false;
+    }
+}
+
+async function saveCameraSelection() {
+    const statusEl = document.getElementById("cameraStatus");
+    if (!cameraSelect.value) return;
+    btnSaveCamera.disabled = true;
+    statusEl.textContent = "正在保存...";
+    try {
+        const res = await fetch("/api/cameras/select", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_id: Number(cameraSelect.value) }),
+        });
+        const data = await res.json();
+        statusEl.textContent = data.message || (res.ok ? "摄像头已保存" : "保存失败");
+    } catch (e) {
+        statusEl.textContent = "保存失败，请检查 Web 服务";
+        btnSaveCamera.disabled = false;
+    }
+}
+
+cameraSelect.addEventListener("change", () => {
+    btnSaveCamera.disabled = !cameraSelect.value || btnStart.disabled;
+});
 
 function appendLog(text) {
     let cls = "info";
@@ -250,6 +323,7 @@ async function saveConfig() {
 fetchStatus();
 loadFaces();
 loadConfig();
+loadCameraSelection();
 
 // 页面完成加载后再建立永久 SSE 连接，避免浏览器一直显示加载状态。
 if (document.readyState === "complete") {
