@@ -50,6 +50,7 @@ _log_queue: queue.Queue = queue.Queue(maxsize=200)
 _known_faces_dir = os.path.join(PROJECT_ROOT, "known_faces")
 _reload_event = threading.Event()  # 通知检测线程重新加载熟人库
 _detection_error: str | None = None
+_startup_phase = "idle"
 _allowed_extensions = {".jpg", ".jpeg", ".png", ".bmp"}
 _camera_operation_lock = threading.Lock()
 _camera_scan_max_devices = 6
@@ -97,13 +98,14 @@ def _reload_recognizer(tolerance: float) -> FaceRecognizer:
 
 def _detection_loop(config):
     global _detection_error, _active_recognizer, _active_alerter
-    global _active_alert_dispatcher
+    global _active_alert_dispatcher, _startup_phase
     _log = logging.getLogger(__name__)
     camera = None
     alert_dispatcher = None
     known_last_logged = {}
 
     try:
+        _startup_phase = "正在打开摄像头"
         camera = Camera(
             device_id=config.camera["device_id"],
             width=config.camera.get("width", 640),
@@ -115,10 +117,12 @@ def _detection_loop(config):
                 "reconnect_interval_seconds", 5
             ),
         )
+        _startup_phase = "正在初始化人脸检测器"
         detector = FaceDetector(
             model=config.recognition.get("model", "hog"),
             upsample=config.recognition.get("upsample", 1),
         )
+        _startup_phase = "正在加载熟人样本"
         recognizer = FaceRecognizer(
             known_faces_dir=_known_faces_dir,
             tolerance=config.recognition.get("tolerance", 0.5),
@@ -130,6 +134,7 @@ def _detection_loop(config):
             ),
             max_samples=config.recognition.get("stranger_max_samples", 5),
         )
+        _startup_phase = "正在初始化告警模块"
         alerter = Alerter(
             config,
             snapshot_callback=lambda event_id, path: (
@@ -162,6 +167,7 @@ def _detection_loop(config):
         _health.reset()
         _health.set_camera_state(camera.state)
         _startup_event.set()
+        _startup_phase = "running"
         _log.info("检测已启动")
 
         while not _stop_event.is_set():
@@ -240,6 +246,7 @@ def _detection_loop(config):
         _active_recognizer = None
         _active_alerter = None
         _active_alert_dispatcher = None
+        _startup_phase = "idle"
         _log.info("检测已停止")
 
 
@@ -421,7 +428,7 @@ def api_select_camera():
 
 @app.route("/api/detect/start", methods=["POST"])
 def api_start():
-    global _detection_thread, _detection_error
+    global _detection_thread, _detection_error, _startup_phase
 
     if _detection_thread and _detection_thread.is_alive():
         return jsonify({"ok": False, "message": "检测已在运行中"}), 409
@@ -434,6 +441,7 @@ def api_start():
     _stop_event.clear()
     _startup_event.clear()
     _detection_error = None
+    _startup_phase = "正在准备启动"
 
     config_path = os.environ.get(
         "STRANGER_DETECTION_CONFIG",
@@ -446,9 +454,15 @@ def api_start():
     )
     _detection_thread.start()
 
-    if not _startup_event.wait(timeout=5):
+    startup_timeout = max(5, min(120, int(
+        config.web.get("startup_timeout_seconds", 30)
+    )))
+    if not _startup_event.wait(timeout=startup_timeout):
         _stop_event.set()
-        return jsonify({"ok": False, "message": "检测启动超时，请检查摄像头"}), 503
+        return jsonify({
+            "ok": False,
+            "message": f"检测初始化超过 {startup_timeout} 秒（{_startup_phase}），请稍后重试或减少熟人样本",
+        }), 503
     if _detection_error or not _detection_thread.is_alive():
         return jsonify({
             "ok": False,

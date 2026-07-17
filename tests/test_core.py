@@ -330,6 +330,16 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(503, response.status_code)
         self.assertIn("camera unavailable", response.get_json()["message"])
 
+    def test_start_timeout_reports_initialization_phase(self):
+        config = Config(os.path.join(TEST_TEMP_ROOT, "missing.yaml"))
+        config._data["web"]["startup_timeout_seconds"] = 5
+        with patch("web.app.Config", return_value=config), patch(
+            "web.app.threading.Thread"
+        ), patch.object(web_app._startup_event, "wait", return_value=False):
+            response = self.client.post("/api/detect/start")
+        self.assertEqual(503, response.status_code)
+        self.assertIn("初始化超过 5 秒", response.get_json()["message"])
+
     def test_config_validation(self):
         response = self.client.post(
             "/api/config",

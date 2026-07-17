@@ -66,6 +66,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "max_brightness": 225,
         "duplicate_image_difference": 2.0,
     },
+    "web": {
+        "startup_timeout_seconds": 30,
+    },
 }
 
 
@@ -131,6 +134,10 @@ class Config:
     @property
     def retention(self) -> Dict[str, Any]:
         return self._data["retention"]
+
+    @property
+    def web(self) -> Dict[str, Any]:
+        return self._data["web"]
 
     def get(self, key: str, default: Any = None) -> Any:
         return self._data.get(key, default)

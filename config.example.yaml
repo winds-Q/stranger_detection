@@ -57,3 +57,6 @@ face_upload_validation:
   min_brightness: 35
   max_brightness: 225
   duplicate_image_difference: 2.0
+
+web:
+  startup_timeout_seconds: 30
