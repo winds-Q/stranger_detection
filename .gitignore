@@ -8,3 +8,5 @@ src/logs/*.log
 **/snapshots/*.jpeg
 **/snapshots/*.png
 config.yaml
+data/*.db
+data/*.db-*

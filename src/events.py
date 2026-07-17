@@ -1,4 +1,5 @@
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -20,9 +21,15 @@ class StrangerEvent:
 class StrangerEventManager:
     """维护陌生人的进入、停留、离开和再次出现状态。"""
 
-    def __init__(self, leave_timeout_seconds: float = 30, clock=time.monotonic):
+    def __init__(
+        self,
+        leave_timeout_seconds: float = 30,
+        clock=time.monotonic,
+        session_id: str | None = None,
+    ):
         self._leave_timeout_seconds = max(0.1, float(leave_timeout_seconds))
         self._clock = clock
+        self._session_id = session_id or uuid.uuid4().hex[:10]
         self._events: Dict[str, StrangerEvent] = {}
         self._event_counts: Dict[str, int] = {}
 
@@ -48,7 +55,7 @@ class StrangerEventManager:
 
         if confirmed:
             event.confirmed = True
-            return event.event_id
+            return f"{self._session_id}-{event.event_id}"
         return None
 
     def mark_departures(self) -> List[str]:

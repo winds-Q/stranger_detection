@@ -51,6 +51,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "save_to": "./snapshots/",
         "max_snapshots": 100,
     },
+    "database": {
+        "path": "./data/alerts.db",
+    },
 }
 
 
@@ -108,6 +111,10 @@ class Config:
     @property
     def snapshot(self) -> Dict[str, Any]:
         return self._data["snapshot"]
+
+    @property
+    def database(self) -> Dict[str, Any]:
+        return self._data["database"]
 
     def get(self, key: str, default: Any = None) -> Any:
         return self._data.get(key, default)

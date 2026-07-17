@@ -14,6 +14,7 @@ from logger import setup_logger
 from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
 from visual import annotate_frame
+from storage import AlertEventRepository
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,10 @@ def main():
         os.path.join(PROJECT_ROOT, "config.yaml"),
     )
     config = Config(config_path)
+    database_path = config.database.get("path", "./data/alerts.db")
+    if not os.path.isabs(database_path):
+        database_path = os.path.join(PROJECT_ROOT, database_path)
+    event_repository = AlertEventRepository(database_path)
 
     camera = Camera(
         device_id=config.camera["device_id"],
@@ -60,6 +65,11 @@ def main():
         queue_size=config.alert.get("queue_size", 20),
         retry_count=config.alert.get("retry_count", 2),
         retry_backoff_seconds=config.alert.get("retry_backoff_seconds", 2),
+        result_callback=lambda event_id, success: (
+            event_repository.update_notification(
+                event_id, "sent" if success else "failed"
+            )
+        ),
     )
     processor = FrameProcessingController(**config.processing)
     confirmation = StrangerConfirmation(**config.detection_confirmation)
@@ -83,6 +93,7 @@ def main():
             if not face_locations:
                 for departed_id in event_manager.mark_departures():
                     confirmation.reset(departed_id)
+                    event_repository.mark_departed(departed_id)
                 time.sleep(0.05)
                 continue
 
@@ -99,6 +110,7 @@ def main():
                     confirmed = confirmation.observe(stranger_id)
                     event_id = event_manager.observe(stranger_id, confirmed)
                     if event_id:
+                        event_repository.record_observation(event_id, stranger_id)
                         alert_event_ids.append(event_id)
                 else:
                     annotations.append((location, known_name, False))
@@ -111,6 +123,7 @@ def main():
             confirmation.cleanup()
             for departed_id in event_manager.mark_departures():
                 confirmation.reset(departed_id)
+                event_repository.mark_departed(departed_id)
 
             time.sleep(0.1)
 

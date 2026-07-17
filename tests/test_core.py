@@ -1,5 +1,6 @@
 import io
 import os
+import sqlite3
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
@@ -22,6 +23,7 @@ from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
 from visual import annotate_frame
 from health import RuntimeHealth
+from storage import AlertEventRepository
 from web import app as web_app
 
 
@@ -120,11 +122,13 @@ class AsyncAlertDispatcherTests(unittest.TestCase):
         alerter = MagicMock()
         alerter.is_configured = True
         alerter.send_alert.side_effect = [False, True]
+        results = []
         dispatcher = AsyncAlertDispatcher(
             alerter,
             cooldown_seconds=0,
             retry_count=1,
             retry_backoff_seconds=0,
+            result_callback=lambda event_id, success: results.append((event_id, success)),
         )
 
         self.assertTrue(dispatcher.submit(np.zeros((4, 4, 3)), "event-1"))
@@ -137,6 +141,7 @@ class AsyncAlertDispatcherTests(unittest.TestCase):
         self.assertFalse(first_call.kwargs["bypass_cooldown"])
         self.assertTrue(retry_call.kwargs["bypass_cooldown"])
         self.assertFalse(retry_call.kwargs["save_snapshot"])
+        self.assertEqual([("event-1", True)], results)
 
     def test_rejects_duplicate_event_during_cooldown(self):
         now = [10.0]
@@ -465,21 +470,22 @@ class StrangerEventManagerTests(unittest.TestCase):
         manager = StrangerEventManager(
             leave_timeout_seconds=30,
             clock=lambda: now[0],
+            session_id="test",
         )
 
         self.assertIsNone(manager.observe("stranger-1", confirmed=False))
         self.assertEqual(
-            "stranger-1-event-1",
+            "test-stranger-1-event-1",
             manager.observe("stranger-1", confirmed=True),
         )
         now[0] = 20
         self.assertEqual(
-            "stranger-1-event-1",
+            "test-stranger-1-event-1",
             manager.observe("stranger-1", confirmed=True),
         )
         now[0] = 51
         self.assertEqual(
-            "stranger-1-event-2",
+            "test-stranger-1-event-2",
             manager.observe("stranger-1", confirmed=True),
         )
 
@@ -523,6 +529,39 @@ class RuntimeHealthTests(unittest.TestCase):
         self.assertEqual(3, snapshot["known_faces"])
         self.assertEqual(1, snapshot["alerts_today"])
         self.assertEqual(2, snapshot["alert_queue_pending"])
+
+
+class AlertEventRepositoryTests(unittest.TestCase):
+    def setUp(self):
+        self.database_path = os.path.join(TEST_TEMP_ROOT, "test_alerts.db")
+        for suffix in ("", "-wal", "-shm"):
+            path = self.database_path + suffix
+            if os.path.exists(path):
+                os.remove(path)
+
+    def tearDown(self):
+        for suffix in ("", "-wal", "-shm"):
+            path = self.database_path + suffix
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_records_updates_and_closes_event(self):
+        repository = AlertEventRepository(self.database_path)
+        repository.record_observation("event-1", "stranger-1")
+        repository.record_observation("event-1", "stranger-1")
+        repository.update_notification("event-1", "sent")
+        repository.mark_departed("stranger-1")
+
+        self.assertEqual(1, repository.count())
+        connection = sqlite3.connect(self.database_path)
+        try:
+            row = connection.execute(
+                "SELECT notification_status, left_at FROM alert_events"
+            ).fetchone()
+        finally:
+            connection.close()
+        self.assertEqual("sent", row[0])
+        self.assertIsNotNone(row[1])
 
 
 if __name__ == "__main__":

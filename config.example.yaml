@@ -42,3 +42,6 @@ alert:
 snapshot:
   save_to: "./snapshots/"
   max_snapshots: 100
+
+database:
+  path: "./data/alerts.db"

@@ -211,12 +211,14 @@ class AsyncAlertDispatcher:
         retry_count: int = 2,
         retry_backoff_seconds: float = 2,
         clock=time.monotonic,
+        result_callback=None,
     ):
         self._alerter = alerter
         self._cooldown_seconds = max(0.0, float(cooldown_seconds))
         self._retry_count = max(0, int(retry_count))
         self._retry_backoff_seconds = max(0.0, float(retry_backoff_seconds))
         self._clock = clock
+        self._result_callback = result_callback
         self._last_submitted = {}
         self._queue = queue.Queue(maxsize=max(1, int(queue_size)))
         self._stop_event = threading.Event()
@@ -264,6 +266,7 @@ class AsyncAlertDispatcher:
                 save_snapshot=attempt == 0,
             )
             if success:
+                self._notify_result(stranger_id, True)
                 return
             if attempt + 1 < attempts:
                 delay = self._retry_backoff_seconds * (2 ** attempt)
@@ -272,7 +275,17 @@ class AsyncAlertDispatcher:
                     delay, attempt + 2, attempts, stranger_id,
                 )
                 if self._stop_event.wait(delay):
+                    self._notify_result(stranger_id, False)
                     return
+        self._notify_result(stranger_id, False)
+
+    def _notify_result(self, stranger_id: str, success: bool) -> None:
+        if not self._result_callback:
+            return
+        try:
+            self._result_callback(stranger_id, success)
+        except Exception:
+            logger.exception("处理报警发送结果失败")
 
     def close(self, timeout: float = 10) -> None:
         self._stop_event.set()

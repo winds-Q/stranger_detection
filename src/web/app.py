@@ -29,6 +29,7 @@ from processing import FrameProcessingController, StrangerConfirmation
 from events import StrangerEventManager
 from visual import annotate_frame
 from health import RuntimeHealth
+from storage import AlertEventRepository
 
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,6 +52,7 @@ _health = RuntimeHealth()
 _active_recognizer = None
 _active_alerter = None
 _active_alert_dispatcher = None
+_event_repository = AlertEventRepository(os.path.join(PROJECT_ROOT, "data", "alerts.db"))
 
 
 _handler = None
@@ -128,6 +130,11 @@ def _detection_loop(config):
             retry_backoff_seconds=config.alert.get(
                 "retry_backoff_seconds", 2
             ),
+            result_callback=lambda event_id, success: (
+                _event_repository.update_notification(
+                    event_id, "sent" if success else "failed"
+                )
+            ),
         )
         processor = FrameProcessingController(**config.processing)
         confirmation = StrangerConfirmation(**config.detection_confirmation)
@@ -167,6 +174,7 @@ def _detection_loop(config):
             if not face_locations:
                 for departed_id in event_manager.mark_departures():
                     confirmation.reset(departed_id)
+                    _event_repository.mark_departed(departed_id)
                 time.sleep(0.05)
                 continue
 
@@ -182,6 +190,7 @@ def _detection_loop(config):
                     confirmed = confirmation.observe(stranger_id)
                     event_id = event_manager.observe(stranger_id, confirmed)
                     if event_id:
+                        _event_repository.record_observation(event_id, stranger_id)
                         alert_event_ids.append(event_id)
                 else:
                     annotations.append((location, known_name, False))
@@ -195,6 +204,7 @@ def _detection_loop(config):
             confirmation.cleanup()
             for departed_id in event_manager.mark_departures():
                 confirmation.reset(departed_id)
+                _event_repository.mark_departed(departed_id)
 
             time.sleep(0.1)
     except Exception as exc:
