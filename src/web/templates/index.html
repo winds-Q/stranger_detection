@@ -86,9 +86,8 @@
             <label class="form-label">发件邮箱</label>
             <input type="email" id="cfgSenderEmail" class="form-input" placeholder="your@email.com">
           </div>
-          <div class="form-row">
-            <label class="form-label">授权码 <span id="envHint" class="env-hint" style="display:none">(已从环境变量读取)</span></label>
-            <input type="password" id="cfgSenderPassword" class="form-input" placeholder="SMTP 授权码">
+          <div class="form-row env-hint">
+            SMTP 授权码仅从环境变量读取 <span id="envHint" style="display:none">（已配置）</span>
           </div>
           <div class="form-row">
             <label class="form-label">收件邮箱（多个地址用逗号分隔）</label>
@@ -99,6 +98,7 @@
             <input type="number" id="cfgCooldown" class="form-input" placeholder="180">
           </div>
           <button type="submit" class="btn btn-green btn-full">保存配置</button>
+          <button type="button" class="btn btn-full" onclick="testEmail()">发送测试邮件</button>
           <div id="configStatus" class="upload-status"></div>
         </form>
       </section>

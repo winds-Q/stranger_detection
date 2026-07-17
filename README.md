@@ -30,7 +30,7 @@ pip install -r requirements.txt
 ```yaml
 alert:
   sender_email: "your_email@gmail.com"
-  sender_password: ""        # 或设环境变量 STRANGER_DETECTION_SMTP_PASSWORD
+  # 授权码仅通过环境变量 STRANGER_DETECTION_SMTP_PASSWORD 提供
   receiver_emails:
     - "first@example.com"
     - "second@example.com"

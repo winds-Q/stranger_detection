@@ -25,10 +25,8 @@ class Alerter:
         self._smtp_server = alert_cfg.get("smtp_server", "smtp.gmail.com")
         self._smtp_port = alert_cfg.get("smtp_port", 587)
         self._sender_email = alert_cfg.get("sender_email", "")
-        self._sender_password = alert_cfg.get("sender_password", "")
-        env_password = os.environ.get("STRANGER_DETECTION_SMTP_PASSWORD")
-        if env_password:
-            self._sender_password = env_password
+        # Secrets must never be loaded from YAML or returned through the Web API.
+        self._sender_password = os.environ.get("STRANGER_DETECTION_SMTP_PASSWORD", "")
         self._receiver_emails = self._normalize_receivers(
             alert_cfg.get("receiver_emails", [])
         )
@@ -143,6 +141,15 @@ class Alerter:
             and self._sender_email
             and self._receiver_emails
             and self._sender_password
+        )
+
+    def send_test_email(self) -> bool:
+        """Verify SMTP connectivity without saving a snapshot or using cooldown."""
+        return self.send_alert(
+            np.full((32, 32, 3), 245, dtype=np.uint8),
+            stranger_id="smtp-test",
+            bypass_cooldown=True,
+            save_snapshot=False,
         )
 
     @staticmethod

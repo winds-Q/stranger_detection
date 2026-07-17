@@ -83,6 +83,7 @@ class AlerterTests(unittest.TestCase):
         self.assertEqual(2, final_count)
 
     @patch("alerter.smtplib.SMTP_SSL")
+    @patch.dict(os.environ, {"STRANGER_DETECTION_SMTP_PASSWORD": "test-secret"})
     def test_port_465_uses_smtp_ssl(self, smtp_ssl):
         smtp_ssl.return_value = MagicMock()
         alerter = Alerter(self._config(TEST_TEMP_ROOT, port=465))
@@ -91,6 +92,7 @@ class AlerterTests(unittest.TestCase):
         smtp_ssl.assert_called_once_with("smtp.example.com", 465, timeout=15)
 
     @patch("alerter.smtplib.SMTP")
+    @patch.dict(os.environ, {"STRANGER_DETECTION_SMTP_PASSWORD": "test-secret"})
     def test_sends_one_alert_to_multiple_receivers(self, smtp):
         smtp.return_value = MagicMock()
         config = self._config(TEST_TEMP_ROOT)
@@ -324,6 +326,23 @@ class WebAppTests(unittest.TestCase):
                 json={"receiver_email": "valid@example.com, invalid"},
             )
         self.assertEqual(400, response.status_code)
+
+    def test_config_api_never_returns_or_saves_password(self):
+        with patch.object(web_app, "_load_yaml_config", return_value={
+            "alert": {"sender_password": "legacy-secret"}
+        }), patch.object(web_app, "_save_yaml_config") as save_config:
+            data = self.client.get("/api/config").get_json()
+            response = self.client.post("/api/config", json={"sender_password": "new-secret"})
+        self.assertNotIn("sender_password", data)
+        self.assertEqual(200, response.status_code)
+        self.assertNotIn("sender_password", save_config.call_args.args[0]["alert"])
+
+    @patch("web.app.Alerter")
+    def test_smtp_test_endpoint_returns_generic_result(self, alerter_cls):
+        alerter_cls.return_value.send_test_email.return_value = True
+        response = self.client.post("/api/config/test-email")
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.get_json()["ok"])
 
     def test_log_stream_declares_reconnect_delay(self):
         response = self.client.get("/api/logs/stream", buffered=False)

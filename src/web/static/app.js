@@ -321,17 +321,14 @@ async function loadConfig() {
         document.getElementById("cfgSmtpServer").value = cfg.smtp_server || "";
         document.getElementById("cfgSmtpPort").value = cfg.smtp_port || 587;
         document.getElementById("cfgSenderEmail").value = cfg.sender_email || "";
-        document.getElementById("cfgSenderPassword").value = cfg.sender_password || "";
         document.getElementById("cfgReceiverEmail").value = cfg.receiver_email || "";
         document.getElementById("cfgCooldown").value = cfg.cooldown_seconds ?? 180;
 
         const envHint = document.getElementById("envHint");
         if (cfg.has_env_password) {
             envHint.style.display = "inline";
-            document.getElementById("cfgSenderPassword").disabled = true;
         } else {
             envHint.style.display = "none";
-            document.getElementById("cfgSenderPassword").disabled = false;
         }
     } catch (e) {
         console.error("加载配置失败", e);
@@ -344,7 +341,6 @@ async function saveConfig() {
         smtp_server: document.getElementById("cfgSmtpServer").value.trim(),
         smtp_port: parseInt(document.getElementById("cfgSmtpPort").value) || 587,
         sender_email: document.getElementById("cfgSenderEmail").value.trim(),
-        sender_password: document.getElementById("cfgSenderPassword").value,
         receiver_email: document.getElementById("cfgReceiverEmail").value.trim(),
         cooldown_seconds: parseInt(document.getElementById("cfgCooldown").value) || 180,
     };
@@ -369,6 +365,18 @@ async function saveConfig() {
     }
     setTimeout(() => { statusEl.textContent = ""; }, 3000);
     return false;
+}
+
+async function testEmail() {
+    const statusEl = document.getElementById("configStatus");
+    statusEl.textContent = "正在发送测试邮件...";
+    try {
+        const res = await fetch("/api/config/test-email", { method: "POST" });
+        const data = await res.json();
+        statusEl.textContent = data.message || (data.ok ? "测试成功" : "测试失败");
+    } catch (_) {
+        statusEl.textContent = "测试请求失败";
+    }
 }
 
 fetchStatus();

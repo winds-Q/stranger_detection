@@ -557,11 +557,7 @@ def _save_yaml_config(data):
 def api_get_config():
     cfg = _load_yaml_config()
     alert_cfg = cfg.get("alert", {})
-    password = alert_cfg.get("sender_password", "")
     env_password = os.environ.get("STRANGER_DETECTION_SMTP_PASSWORD")
-    if env_password:
-        password = env_password
-    masked = "****" if password else ""
     receiver_value = alert_cfg.get(
         "receiver_emails",
         alert_cfg.get("receiver_email", ""),
@@ -575,7 +571,6 @@ def api_get_config():
         "smtp_server": alert_cfg.get("smtp_server", ""),
         "smtp_port": alert_cfg.get("smtp_port", 587),
         "sender_email": alert_cfg.get("sender_email", ""),
-        "sender_password": masked,
         "receiver_email": receiver_value,
         "has_env_password": bool(env_password),
     })
@@ -610,8 +605,8 @@ def api_update_config():
         alert_cfg["smtp_port"] = smtp_port
     if "sender_email" in data:
         alert_cfg["sender_email"] = str(data["sender_email"])
-    if "sender_password" in data and data["sender_password"] and data["sender_password"] != "****":
-        alert_cfg["sender_password"] = str(data["sender_password"])
+    # Never accept or persist SMTP secrets through the Web API.
+    alert_cfg.pop("sender_password", None)
     if "receiver_email" in data:
         receiver_text = str(data["receiver_email"])
         receivers = Alerter._normalize_receivers(receiver_text)
@@ -630,6 +625,21 @@ def api_update_config():
 
     _save_yaml_config(cfg)
     return jsonify({"ok": True, "message": "配置已保存"})
+
+
+@app.route("/api/config/test-email", methods=["POST"])
+def api_test_email():
+    try:
+        sent = Alerter(Config(_CONFIG_PATH)).send_test_email()
+    except Exception:
+        _log.exception("SMTP test failed")
+        sent = False
+    if not sent:
+        return jsonify({
+            "ok": False,
+            "message": "测试邮件发送失败，请检查 SMTP 参数、收件邮箱和环境变量授权码",
+        }), 503
+    return jsonify({"ok": True, "message": "测试邮件已发送"})
 
 
 def main():
