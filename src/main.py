@@ -11,6 +11,7 @@ from recognizer import FaceRecognizer, StrangerTracker
 from alerter import Alerter
 from config_loader import Config
 from logger import setup_logger
+from processing import FrameProcessingController
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ def main():
         ),
     )
     alerter = Alerter(config)
+    processor = FrameProcessingController(**config.processing)
 
     logger.info("陌生人检测系统已启动 (config=%s)", config_path)
 
@@ -56,12 +58,17 @@ def main():
                 time.sleep(0.1)
                 continue
 
-            face_locations = detector.detect(frame)
+            if not processor.should_process():
+                time.sleep(0.01)
+                continue
+
+            detection_frame = processor.prepare_frame(frame)
+            face_locations = detector.detect(detection_frame)
             if not face_locations:
                 time.sleep(0.05)
                 continue
 
-            face_encodings = detector.encode(frame, face_locations)
+            face_encodings = detector.encode(detection_frame, face_locations)
 
             for encoding in face_encodings:
                 if recognizer.is_stranger(encoding):

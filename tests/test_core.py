@@ -17,6 +17,7 @@ if SRC_DIR not in sys.path:
 from alerter import Alerter
 from config_loader import Config
 from recognizer import StrangerTracker
+from processing import FrameProcessingController
 from web import app as web_app
 
 
@@ -160,6 +161,35 @@ class StrangerTrackerTests(unittest.TestCase):
         first_id = tracker.identify(face_a)
         self.assertEqual(first_id, tracker.identify(face_a_changed))
         self.assertNotEqual(first_id, tracker.identify(face_b))
+
+
+class FrameProcessingControllerTests(unittest.TestCase):
+    def test_skips_frames_and_limits_detection_fps(self):
+        now = [0.0]
+        controller = FrameProcessingController(
+            detect_every_n_frames=2,
+            max_detection_fps=2,
+            clock=lambda: now[0],
+        )
+
+        self.assertTrue(controller.should_process())
+        self.assertFalse(controller.should_process())
+        now[0] = 0.2
+        self.assertFalse(controller.should_process())
+        self.assertFalse(controller.should_process())
+        now[0] = 0.6
+        self.assertTrue(controller.should_process())
+
+    def test_resizes_frame_and_restores_locations(self):
+        controller = FrameProcessingController(detection_scale=0.5)
+        frame = np.zeros((100, 200, 3), dtype=np.uint8)
+
+        resized = controller.prepare_frame(frame)
+
+        self.assertEqual((50, 100, 3), resized.shape)
+        self.assertEqual([(20, 40, 60, 10)], controller.restore_locations([
+            (10, 20, 30, 5)
+        ]))
 
 
 if __name__ == "__main__":

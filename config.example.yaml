@@ -9,6 +9,11 @@ recognition:
   stranger_tolerance: 0.5
   stranger_retention_seconds: 3600
 
+processing:
+  detect_every_n_frames: 3
+  max_detection_fps: 4
+  detection_scale: 0.5
+
 alert:
   enabled: true
   cooldown_seconds: 180

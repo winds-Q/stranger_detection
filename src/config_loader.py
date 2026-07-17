@@ -19,6 +19,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "stranger_tolerance": 0.5,
         "stranger_retention_seconds": 3600,
     },
+    "processing": {
+        "detect_every_n_frames": 3,
+        "max_detection_fps": 4,
+        "detection_scale": 0.5,
+    },
     "alert": {
         "enabled": True,
         "cooldown_seconds": 180,
@@ -69,6 +74,10 @@ class Config:
     @property
     def recognition(self) -> Dict[str, Any]:
         return self._data["recognition"]
+
+    @property
+    def processing(self) -> Dict[str, Any]:
+        return self._data["processing"]
 
     @property
     def alert(self) -> Dict[str, Any]:
