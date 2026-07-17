@@ -247,6 +247,16 @@ button, input { font: inherit; }
 .health-card { min-width: 0; padding: 13px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 10px 26px rgba(0,0,0,.13); }
 .health-label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 10px; }
 .health-card strong { display: block; overflow: hidden; color: #edf2ff; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.history-panel { padding: 17px 20px; }
+.event-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-height: 210px; overflow-y: auto; }
+.event-item { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(3,7,16,.45); }
+.event-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.event-id { overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.event-status { padding: 2px 6px; border-radius: 99px; color: var(--muted); background: var(--surface-soft); font-size: 9px; }
+.event-meta { color: var(--muted); font-size: 10px; line-height: 1.6; }
+.event-actions { display: flex; gap: 6px; margin-top: 9px; }
+.event-actions .btn { min-height: 27px; padding: 3px 8px; font-size: 10px; }
+.empty-state { grid-column: 1 / -1; padding: 18px; color: var(--muted); text-align: center; font-size: 12px; }
 .log-panel { min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 20px; }
 .log-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .log-title { display: flex; align-items: center; gap: 11px; }
@@ -285,6 +295,7 @@ button, input { font: inherit; }
     .sidebar-inner { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
     .workspace { padding: 0 18px 22px; }
     .health-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .event-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .log-panel { min-height: 480px; }
 }
 
@@ -299,6 +310,7 @@ button, input { font: inherit; }
     .workspace { padding-bottom: 16px; }
     .log-panel { min-height: 430px; padding: 15px; }
     .health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .event-list { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

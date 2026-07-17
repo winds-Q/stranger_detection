@@ -563,6 +563,17 @@ class AlertEventRepositoryTests(unittest.TestCase):
         self.assertEqual("sent", row[0])
         self.assertIsNotNone(row[1])
 
+    def test_lists_marks_and_deletes_events(self):
+        repository = AlertEventRepository(self.database_path)
+        repository.record_observation("event-2", "stranger-2")
+        events = repository.list_events()
+        self.assertEqual(1, len(events))
+        event_id = events[0]["id"]
+        self.assertTrue(repository.set_handled(event_id, True))
+        self.assertEqual(1, repository.get_event(event_id)["handled"])
+        self.assertEqual({"snapshot_path": None}, repository.delete_event(event_id))
+        self.assertEqual(0, repository.count())
+
 
 if __name__ == "__main__":
     unittest.main()

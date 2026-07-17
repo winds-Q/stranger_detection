@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class Alerter:
-    def __init__(self, config):
+    def __init__(self, config, snapshot_callback=None):
         alert_cfg = config.alert
         self._enabled = alert_cfg.get("enabled", True)
         self._cooldown_seconds = alert_cfg.get("cooldown_seconds", 180)
@@ -42,6 +42,7 @@ class Alerter:
         self._max_snapshots = snapshot_cfg.get("max_snapshots", 100)
 
         self._last_alert_times = {}
+        self._snapshot_callback = snapshot_callback
 
         if self._enabled:
             logger.info("报警模块已初始化 (cooldown=%ds)", self._cooldown_seconds)
@@ -77,7 +78,9 @@ class Alerter:
         # 本地留证不应依赖邮件配置或网络状态。
         if save_snapshot:
             try:
-                self._save_snapshot(image_data)
+                snapshot_path = self._save_snapshot(image_data)
+                if self._snapshot_callback:
+                    self._snapshot_callback(stranger_id, snapshot_path)
             except OSError as exc:
                 logger.error("保存陌生人截图失败: %s", exc)
         if not bypass_cooldown:
@@ -165,7 +168,7 @@ class Alerter:
                 seen.add(key)
         return receivers
 
-    def _save_snapshot(self, image_data: bytes) -> None:
+    def _save_snapshot(self, image_data: bytes) -> str:
         """保存陌生人截图到本地，超出 max_snapshots 时自动清理旧截图。"""
         os.makedirs(self._snapshot_dir, exist_ok=True)
 
@@ -186,6 +189,7 @@ class Alerter:
             for old_path in snapshots[: len(snapshots) - self._max_snapshots]:
                 os.remove(old_path)
                 logger.debug("已清理旧截图: %s", old_path)
+        return filepath
 
     @staticmethod
     def _build_html(stranger_id: str = "unknown") -> str:

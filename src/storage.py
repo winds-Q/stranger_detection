@@ -92,6 +92,43 @@ class AlertEventRepository:
                 "SELECT COUNT(*) FROM alert_events"
             ).fetchone()[0])
 
+    def list_events(self, limit: int = 50, status: str | None = None):
+        limit = max(1, min(200, int(limit)))
+        query = "SELECT * FROM alert_events"
+        parameters = []
+        if status:
+            query += " WHERE notification_status = ?"
+            parameters.append(status)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        parameters.append(limit)
+        with closing(self._connect()) as connection:
+            return [dict(row) for row in connection.execute(query, parameters)]
+
+    def get_event(self, event_id: int):
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT * FROM alert_events WHERE id = ?", (event_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def set_handled(self, event_id: int, handled: bool) -> bool:
+        with self._lock, closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                "UPDATE alert_events SET handled = ? WHERE id = ?",
+                (1 if handled else 0, event_id),
+            )
+            return cursor.rowcount > 0
+
+    def delete_event(self, event_id: int):
+        with self._lock, closing(self._connect()) as connection, connection:
+            row = connection.execute(
+                "SELECT snapshot_path FROM alert_events WHERE id = ?", (event_id,)
+            ).fetchone()
+            if not row:
+                return None
+            connection.execute("DELETE FROM alert_events WHERE id = ?", (event_id,))
+            return {"snapshot_path": row["snapshot_path"]}
+
     @staticmethod
     def _now() -> str:
         return datetime.now().isoformat(timespec="seconds")

@@ -10,7 +10,7 @@ import time
 import cv2
 import numpy as np
 import yaml
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -121,7 +121,14 @@ def _detection_loop(config):
             ),
             max_samples=config.recognition.get("stranger_max_samples", 5),
         )
-        alerter = Alerter(config)
+        alerter = Alerter(
+            config,
+            snapshot_callback=lambda event_id, path: (
+                _event_repository.update_notification(
+                    event_id, "pending", snapshot_path=path
+                )
+            ),
+        )
         alert_dispatcher = AsyncAlertDispatcher(
             alerter,
             cooldown_seconds=config.alert.get("cooldown_seconds", 180),
@@ -252,6 +259,70 @@ def api_cameras():
         "selected_device_id": camera_cfg.get("device_id", 0),
         "scan_max_devices": _camera_scan_max_devices,
     })
+
+
+@app.route("/api/events")
+def api_events():
+    try:
+        limit = int(request.args.get("limit", 50))
+    except ValueError:
+        return jsonify({"ok": False, "message": "limit 必须是整数"}), 400
+    status = request.args.get("status") or None
+    if status not in (None, "pending", "sent", "failed"):
+        return jsonify({"ok": False, "message": "通知状态不合法"}), 400
+    events = _event_repository.list_events(limit=limit, status=status)
+    for event in events:
+        event["handled"] = bool(event["handled"])
+        event["has_snapshot"] = bool(event.pop("snapshot_path", None))
+        event.pop("notification_error", None)
+    return jsonify(events)
+
+
+@app.route("/api/events/<int:event_id>/handled", methods=["POST"])
+def api_event_handled(event_id):
+    data = request.get_json(silent=True) or {}
+    handled = bool(data.get("handled", True))
+    if not _event_repository.set_handled(event_id, handled):
+        return jsonify({"ok": False, "message": "告警事件不存在"}), 404
+    return jsonify({"ok": True, "handled": handled})
+
+
+@app.route("/api/events/<int:event_id>", methods=["DELETE"])
+def api_delete_event(event_id):
+    deleted = _event_repository.delete_event(event_id)
+    if deleted is None:
+        return jsonify({"ok": False, "message": "告警事件不存在"}), 404
+    snapshot_path = deleted["snapshot_path"]
+    if snapshot_path and request.args.get("delete_snapshot") == "1":
+        _safe_delete_snapshot(snapshot_path)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/events/<int:event_id>/snapshot")
+def api_event_snapshot(event_id):
+    event = _event_repository.get_event(event_id)
+    if not event or not event.get("snapshot_path"):
+        return jsonify({"ok": False, "message": "截图不存在"}), 404
+    path = os.path.abspath(event["snapshot_path"])
+    snapshot_root = os.path.abspath(os.path.join(PROJECT_ROOT, "snapshots"))
+    try:
+        if os.path.commonpath([path, snapshot_root]) != snapshot_root:
+            raise ValueError
+    except ValueError:
+        return jsonify({"ok": False, "message": "截图路径不合法"}), 400
+    if not os.path.isfile(path):
+        return jsonify({"ok": False, "message": "截图文件不存在"}), 404
+    return send_file(path, mimetype="image/jpeg", conditional=True)
+
+
+def _safe_delete_snapshot(snapshot_path):
+    path = os.path.abspath(snapshot_path)
+    snapshot_root = os.path.abspath(os.path.join(PROJECT_ROOT, "snapshots"))
+    try:
+        if os.path.commonpath([path, snapshot_root]) == snapshot_root and os.path.isfile(path):
+            os.remove(path)
+    except (ValueError, OSError):
+        logging.getLogger(__name__).warning("删除告警截图失败")
 
 
 @app.route("/api/cameras/scan", methods=["POST"])

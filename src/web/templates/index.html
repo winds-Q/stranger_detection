@@ -122,6 +122,13 @@
         <div class="health-card"><span class="health-label">邮件状态</span><strong id="healthSmtp">未配置</strong></div>
         <div class="health-card"><span class="health-label">待发队列</span><strong id="healthQueue">0</strong></div>
       </div>
+      <div class="history-panel card">
+        <div class="log-header">
+          <div class="log-title"><span class="live-mark">▦</span><div><h3>告警历史</h3><div class="log-meta">最近的陌生人安全事件</div></div></div>
+          <button class="btn btn-small" type="button" onclick="loadEvents()">刷新</button>
+        </div>
+        <div id="eventList" class="event-list"><div class="empty-state">暂无告警记录</div></div>
+      </div>
       <div class="log-panel card">
         <div class="log-header">
           <div class="log-title">

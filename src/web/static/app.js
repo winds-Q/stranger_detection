@@ -97,6 +97,42 @@ async function saveCameraSelection() {
     }
 }
 
+async function loadEvents() {
+    const list = document.getElementById("eventList");
+    try {
+        const res = await fetch("/api/events?limit=30");
+        const events = await res.json();
+        if (!events.length) {
+            list.innerHTML = '<div class="empty-state">暂无告警记录</div>';
+            return;
+        }
+        const statusLabels = { pending: "待发送", sent: "已发送", failed: "发送失败" };
+        list.innerHTML = events.map(event => `
+          <div class="event-item">
+            <div class="event-top"><span class="event-id" title="${escapeHtml(event.event_key)}">${escapeHtml(event.stranger_id)}</span><span class="event-status">${statusLabels[event.notification_status] || event.notification_status}</span></div>
+            <div class="event-meta">出现：${escapeHtml(event.first_seen_at)}<br>离开：${escapeHtml(event.left_at || "仍在画面或未确认")}</div>
+            <div class="event-actions">
+              ${event.has_snapshot ? `<button class="btn btn-small" onclick="window.open('/api/events/${event.id}/snapshot','_blank')">截图</button>` : ""}
+              <button class="btn btn-small" onclick="markEventHandled(${event.id}, ${!event.handled})">${event.handled ? "取消处理" : "标记处理"}</button>
+              <button class="btn btn-red" onclick="deleteEvent(${event.id})">删除</button>
+            </div>
+          </div>`).join("");
+    } catch (e) {
+        list.innerHTML = '<div class="empty-state">告警历史加载失败</div>';
+    }
+}
+
+async function markEventHandled(eventId, handled) {
+    await fetch(`/api/events/${eventId}/handled`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({handled})});
+    loadEvents();
+}
+
+async function deleteEvent(eventId) {
+    if (!confirm("确定删除此告警记录及关联截图？")) return;
+    await fetch(`/api/events/${eventId}?delete_snapshot=1`, {method: "DELETE"});
+    loadEvents();
+}
+
 cameraSelect.addEventListener("change", () => {
     btnSaveCamera.disabled = !cameraSelect.value || btnStart.disabled;
 });
@@ -340,6 +376,8 @@ setInterval(fetchStatus, 3000);
 loadFaces();
 loadConfig();
 loadCameraSelection();
+loadEvents();
+setInterval(loadEvents, 15000);
 
 // 页面完成加载后再建立永久 SSE 连接，避免浏览器一直显示加载状态。
 if (document.readyState === "complete") {
