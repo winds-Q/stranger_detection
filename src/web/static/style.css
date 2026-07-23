@@ -261,12 +261,13 @@ button, input { font: inherit; }
     min-height: 0;
     padding: 22px 24px 26px 20px;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: scroll;
+    overscroll-behavior: contain;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: #465574 rgba(5, 9, 20, .35);
 }
-.workspace { display: flex; flex-direction: column; gap: 14px; }
+.workspace { display: flex; flex-direction: column; gap: 14px; padding-bottom: 34px; }
 .health-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
 .health-card { min-width: 0; padding: 13px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 10px 26px rgba(0,0,0,.13); }
 .health-label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 10px; }
@@ -304,18 +305,19 @@ button, input { font: inherit; }
 .event-actions .btn { min-height: 27px; padding: 3px 8px; font-size: 10px; }
 .event-photo-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .empty-state { grid-column: 1 / -1; padding: 18px; color: var(--muted); text-align: center; font-size: 12px; }
-.log-panel { min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
+.log-panel { min-width: 0; min-height: 420px; flex: 0 0 auto; display: flex; flex-direction: column; padding: 20px; }
 .log-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .log-title { display: flex; align-items: center; gap: 11px; }
 .log-title .live-mark { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; color: var(--cyan); background: rgba(56,214,218,.1); }
 .log-meta { margin-top: 4px; color: var(--muted); font-size: 11px; }
 
 .log-viewer {
-    flex: 1;
+    flex: 1 1 auto;
     width: 100%;
     min-width: 0;
-    min-height: 280px;
-    max-height: 55vh;
+    min-height: 0;
+    height: 330px;
+    max-height: none;
     padding: 16px 18px;
     overflow: auto;
     border: 1px solid rgba(148,163,184,.1);
