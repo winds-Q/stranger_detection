@@ -27,7 +27,7 @@ function updatePreview(running) {
     const state = document.getElementById("previewState");
     if (running && !previewActive) {
         previewActive = true;
-        image.src = /api/preview?t=;
+        image.src = `/api/preview?t=${Date.now()}`;
         frame.classList.add("active");
         state.textContent = "直播中";
         state.className = "event-status status-sent";

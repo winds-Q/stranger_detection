@@ -456,6 +456,12 @@ class WebAppTests(unittest.TestCase):
             response.close()
             web_app._clear_preview()
 
+    def test_frontend_preview_url_is_valid_javascript(self):
+        script_path = os.path.join(PROJECT_ROOT, "src", "web", "static", "app.js")
+        with open(script_path, encoding="utf-8") as script_file:
+            script = script_file.read()
+        self.assertIn('image.src = `/api/preview?t=${Date.now()}`;', script)
+        self.assertNotIn("image.src = /api/preview?t=;", script)
     def test_camera_scan_returns_available_devices_and_releases_all(self):
         unavailable = MagicMock()
         unavailable.isOpened.return_value = False
