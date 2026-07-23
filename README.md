@@ -60,8 +60,7 @@ python main.py
 **Web UI 模式（推荐）：**
 
 ```bash
-cd src/web
-python app.py
+python run_web.py
 ```
 
 浏览器访问 http://localhost:5050

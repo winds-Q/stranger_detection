@@ -28,6 +28,7 @@ from health import RuntimeHealth
 from storage import AlertEventRepository
 from cleanup import RetentionCleaner
 from web import app as web_app
+from web import server as web_server
 
 
 class AlerterTests(unittest.TestCase):
@@ -214,6 +215,14 @@ class WebAppTests(unittest.TestCase):
             os.path.join(PROJECT_ROOT, "known_faces"),
             web_app._known_faces_dir,
         )
+
+    def test_single_instance_check_detects_an_open_port(self):
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        with patch("web.server.socket.create_connection", return_value=connection):
+            self.assertTrue(web_server.is_port_in_use("0.0.0.0", 5050))
+        with patch("web.server.socket.create_connection", side_effect=OSError):
+            self.assertFalse(web_server.is_port_in_use("127.0.0.1", 5050))
 
     def test_status_contains_health_fields_without_secrets(self):
         response = self.client.get("/api/status")

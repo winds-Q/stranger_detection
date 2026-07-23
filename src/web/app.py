@@ -723,7 +723,7 @@ def api_test_email():
     return jsonify({"ok": True, "message": "测试邮件已发送"})
 
 
-def main():
+def initialize_runtime():
     setup_logger(log_dir=os.path.join(PROJECT_ROOT, "logs"))
     logging.getLogger().setLevel(logging.INFO)
     _init_sse_handler()
@@ -741,12 +741,25 @@ def main():
         interval_hours=cleanup_config.retention.get("cleanup_interval_hours", 12),
     )
     retention_worker.start()
+    return retention_worker
+
+
+def stop_runtime(retention_worker):
+    if _detection_thread and _detection_thread.is_alive():
+        _stop_event.set()
+        _detection_thread.join(timeout=10)
+    retention_worker.close()
+
+
+def main():
+    """Flask 开发服务器入口；生产环境请使用项目根目录 run_web.py。"""
+    retention_worker = initialize_runtime()
     host = os.environ.get("STRANGER_DETECTION_WEB_HOST", "127.0.0.1")
     port = int(os.environ.get("STRANGER_DETECTION_WEB_PORT", "5050"))
     try:
         app.run(host=host, port=port, debug=False, threaded=True)
     finally:
-        retention_worker.close()
+        stop_runtime(retention_worker)
 
 
 if __name__ == "__main__":
