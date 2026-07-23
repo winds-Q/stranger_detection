@@ -9,6 +9,7 @@ const btnSaveCamera = document.getElementById("btnSaveCamera");
 
 let logLines = [];
 let logEventSource = null;
+let previewActive = false;
 
 function updateButtons(running) {
     btnStart.disabled = running;
@@ -17,6 +18,26 @@ function updateButtons(running) {
     statusTxt.textContent = running ? "运行中" : "未运行";
     btnScanCamera.disabled = running;
     btnSaveCamera.disabled = running || !cameraSelect.value;
+    updatePreview(running);
+}
+
+function updatePreview(running) {
+    const image = document.getElementById("previewImage");
+    const frame = document.getElementById("previewFrame");
+    const state = document.getElementById("previewState");
+    if (running && !previewActive) {
+        previewActive = true;
+        image.src = /api/preview?t=;
+        frame.classList.add("active");
+        state.textContent = "直播中";
+        state.className = "event-status status-sent";
+    } else if (!running && previewActive) {
+        previewActive = false;
+        image.removeAttribute("src");
+        frame.classList.remove("active");
+        state.textContent = "未运行";
+        state.className = "event-status status-pending";
+    }
 }
 
 function updateHealth(data) {

@@ -271,6 +271,12 @@ button, input { font: inherit; }
 .health-card { min-width: 0; padding: 13px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 10px 26px rgba(0,0,0,.13); }
 .health-label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 10px; }
 .health-card strong { display: block; overflow: hidden; color: #edf2ff; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.preview-panel { padding: 17px 20px; }
+.preview-frame { position: relative; display: grid; place-items: center; min-height: 260px; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: rgba(3,7,16,.72); }
+.preview-frame img { display: none; width: 100%; max-height: 440px; object-fit: contain; }
+.preview-frame.active img { display: block; }
+.preview-placeholder { color: var(--muted); font-size: 12px; }
+.preview-frame.active .preview-placeholder { display: none; }
 .history-panel { padding: 17px 20px; }
 .event-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-height: 210px; overflow-y: auto; }
 .event-item { overflow: hidden; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(3,7,16,.45); transition: border-color .18s, box-shadow .18s; }

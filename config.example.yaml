@@ -61,3 +61,7 @@ face_upload_validation:
 
 web:
   startup_timeout_seconds: 30
+
+preview:
+  enabled: true
+  jpeg_quality: 75

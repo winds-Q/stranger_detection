@@ -444,6 +444,18 @@ class WebAppTests(unittest.TestCase):
             handler.emit(access_record)
             enqueue.assert_not_called()
 
+    def test_preview_stream_reuses_published_detection_frame(self):
+        web_app._detection_thread = MagicMock()
+        web_app._detection_thread.is_alive.return_value = True
+        web_app._publish_preview(np.zeros((20, 20, 3), dtype=np.uint8))
+        response = self.client.get("/api/preview", buffered=False)
+        try:
+            chunk = next(response.response)
+            self.assertIn(b"Content-Type: image/jpeg", chunk)
+        finally:
+            response.close()
+            web_app._clear_preview()
+
     def test_camera_scan_returns_available_devices_and_releases_all(self):
         unavailable = MagicMock()
         unavailable.isOpened.return_value = False

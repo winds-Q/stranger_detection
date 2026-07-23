@@ -70,6 +70,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "web": {
         "startup_timeout_seconds": 30,
     },
+    "preview": {
+        "enabled": True,
+        "jpeg_quality": 75,
+    },
 }
 
 

@@ -60,6 +60,9 @@ _active_alerter = None
 _active_alert_dispatcher = None
 _event_repository = AlertEventRepository(os.path.join(PROJECT_ROOT, "data", "alerts.db"))
 _face_cache_path = os.path.join(PROJECT_ROOT, "data", "face_encodings.db")
+_preview_condition = threading.Condition()
+_preview_jpeg = None
+_preview_version = 0
 
 
 _handler = None
@@ -89,6 +92,25 @@ class _SSELogHandler(logging.Handler):
             pass
 
 
+def _publish_preview(frame, jpeg_quality=75):
+    global _preview_jpeg, _preview_version
+    ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, int(jpeg_quality)])
+    if not ok:
+        return
+    with _preview_condition:
+        _preview_jpeg = encoded.tobytes()
+        _preview_version += 1
+        _preview_condition.notify_all()
+
+
+def _clear_preview():
+    global _preview_jpeg, _preview_version
+    with _preview_condition:
+        _preview_jpeg = None
+        _preview_version += 1
+        _preview_condition.notify_all()
+
+
 def _reload_recognizer(tolerance: float) -> FaceRecognizer:
     """重新加载熟人库。"""
     return FaceRecognizer(
@@ -105,6 +127,8 @@ def _detection_loop(config):
     camera = None
     alert_dispatcher = None
     known_last_logged = {}
+    preview_enabled = config.get("preview", {}).get("enabled", True)
+    preview_quality = config.get("preview", {}).get("jpeg_quality", 75)
 
     try:
         _startup_phase = "正在打开摄像头"
@@ -199,6 +223,8 @@ def _detection_loop(config):
             _health.record_detection()
             face_locations = detector.detect(detection_frame)
             if not face_locations:
+                if preview_enabled:
+                    _publish_preview(frame, preview_quality)
                 for departed_id in event_manager.mark_departures():
                     confirmation.reset(departed_id)
                     _event_repository.mark_departed(departed_id)
@@ -226,8 +252,12 @@ def _detection_loop(config):
                         _log.info("检测到熟人：%s", known_name)
                         known_last_logged[known_name] = now
 
+            annotated_frame = annotate_frame(frame, annotations)
+            if preview_enabled:
+                _publish_preview(annotated_frame, preview_quality)
+
             if alert_event_ids:
-                alert_frame = annotate_frame(frame, annotations)
+                alert_frame = annotated_frame
                 for event_id in alert_event_ids:
                     if alert_dispatcher.submit(alert_frame, event_id):
                         _health.record_alert()
@@ -251,6 +281,7 @@ def _detection_loop(config):
         _active_recognizer = None
         _active_alerter = None
         _active_alert_dispatcher = None
+        _clear_preview()
         _startup_phase = "idle"
         _log.info("检测已停止")
 
@@ -274,6 +305,25 @@ def api_status():
         ),
     )
     return jsonify({"running": running, "error": _detection_error, **health})
+
+
+@app.route("/api/preview")
+def api_preview():
+    running = _detection_thread is not None and _detection_thread.is_alive()
+    if not running:
+        return jsonify({"ok": False, "message": "检测未运行"}), 409
+
+    def generate():
+        delivered_version = -1
+        while _detection_thread and _detection_thread.is_alive():
+            with _preview_condition:
+                _preview_condition.wait_for(lambda: _preview_version != delivered_version, timeout=5)
+                image = _preview_jpeg
+                delivered_version = _preview_version
+            if image:
+                yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + image + b"\r\n"
+
+    return Response(generate(), mimetype="multipart/x-mixed-replace; boundary=frame", headers={"Cache-Control": "no-store"})
 
 
 @app.route("/api/cameras")
